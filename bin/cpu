@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+
+import signal
+import subprocess
+
+from systemhud import timed_updates
+from systemhud.lib import cpu
+from systemhud.ui.common import gyr_gradient
+from systemhud.ui.icons import ProgressiveValue, set_icon
+from systemhud.ui.notifications import Notification
+
+PERIOD = 1
+GRADIENT = ProgressiveValue(
+    [
+        "00CC00",
+        "1CD200",
+        "39D700",
+        "55DD00",  # 0- 5-10-15-20
+        "71E300",
+        "8EE800",
+        "AAEE00",
+        "C6F400",  # 20-25-30-35-40
+        "E3F900",
+        "FFFF00",
+        "FFE600",
+        "FFCC00",  # 40-45-50-55-60
+        "FFB300",
+        "FF9900",
+        "FF8000",
+        "FF6600",  # 60-65-70-75-80
+        "FF4C00",
+        "FF3300",
+        "FF1A00",
+        "FF0000",  # 80-85-90-95-100
+    ]
+)
+ICON = ""
+NOTIFICATION_ROWS = ["usage", "user", "system", "nice", "iowait", "steal"]
+TOP_PROC_COUNT = 5
+NOTIFICATION = Notification(transient=True)
+
+
+def update_icon() -> None:
+    v = cpu.diffs(update=True)
+    set_icon(f"%{{F#{gyr_gradient(v[0].usage_percent)}}}{ICON}%{{F-}}")
+
+
+def colored_number(n: int) -> str:
+    color = GRADIENT(n)
+    return "<span foreground='#{}'>{:02.0f}</span>".format(color, n)
+
+
+def summary_notification(*_) -> None:
+    global NOTIFICATION_ROWS, NOTIFICATION
+
+    body = "<b><big>Usage Per Core:</big></b>\n"
+    body += "<span font_desc='Anonymice Nerd Font Mono'>"
+
+    cpus = cpu.diffs()
+
+    col_1_fmt = f"{{:>{max([len(c) for c in (['cpu'] + NOTIFICATION_ROWS)])}}}"
+    body += (" ".join([col_1_fmt] + ["{:>2}"] * len(cpus))).format(
+        *["cpu"] + [str(c) for c in range(1, len(cpus) + 1)]
+    )
+    body += "\n"
+
+    for row_prop in NOTIFICATION_ROWS:
+        body += col_1_fmt.format(row_prop)
+        for c in cpus:
+            body += f" {colored_number(getattr(c, row_prop) / c.total)}"
+        body += "\n"
+
+    body += "</span>"
+
+    body += "\n<b><big>Top {} Processes:</big></b>\n".format(TOP_PROC_COUNT)
+    body += "<span font_desc='Anonymice Nerd Font Mono'>"
+
+    by_process_raw = (
+        subprocess.run(
+            ["ps", "-o", "%cpu,comm,cmd,pid", "ax", "--no-headers"],
+            stdout=subprocess.PIPE,
+        )
+        .stdout.decode("utf-8")
+        .split("\n")
+    )
+    by_process = []
+    for line_raw in by_process_raw:
+        if not line_raw:
+            continue
+
+        perc, name, r = line_raw.split(maxsplit=2)
+        cmd, pid = r.rsplit(maxsplit=1)
+        by_process.append((float(perc), name, cmd, pid))
+
+    for proc in sorted(by_process, reverse=True)[:TOP_PROC_COUNT]:
+        body += "{}% <u>{}</u> ({})\n".format(
+            proc[0], proc[2] if len(proc[2]) < 20 else proc[1], proc[3]
+        )
+
+    body += "</span>"
+    NOTIFICATION(
+        title="CPU USAGE",
+        body=body,
+    )
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGUSR1, summary_notification)
+    timed_updates(update_icon, PERIOD)

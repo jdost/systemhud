@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+"""
+TODO:
+ - USR1 will pop up a rofi with two scripts, one to list sinks, one sources
+"""
+
+import enum
+import signal
+import subprocess
+from time import sleep
+from typing import Optional
+
+from systemhud import timed_updates
+from systemhud.lib import pulseaudio
+from systemhud.ui.icons import dots, set_icon
+from systemhud.ui.notifications import Notification, progress_bar
+from systemhud.util import set_pidfile
+
+PERIOD = 5
+PROGRESS_BAR_COLOR = "FFFFFF"
+
+
+SINK = pulseaudio.Device(pulseaudio.Type.SINK)
+SOURCE = pulseaudio.Device(pulseaudio.Type.SOURCE)
+NOTIFICATION = Notification(
+    "pulsemonitor",
+    icon="audio-speakers",
+    transient=True,
+)
+
+
+def update_icon() -> None:
+    global SINK, SOURCE
+    set_icon(
+        f"{dots(SINK.volume)}%{{O-7}}{dots(SOURCE.volume)}%{{O-11}}%{{F-}}"
+    )
+
+
+def summary_notification(*_) -> None:
+    global SINK, NOTIFICATION
+    NOTIFICATION(
+        title=SINK.name,
+        body=progress_bar(SINK.volume, color=PROGRESS_BAR_COLOR),
+    )
+    update_icon()
+
+
+if __name__ == "__main__":
+    set_pidfile("pulseaudio")
+    signal.signal(signal.SIGUSR1, summary_notification)
+    timed_updates(update_icon, PERIOD)

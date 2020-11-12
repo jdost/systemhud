@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+
+import signal
+import subprocess
+from time import sleep
+from typing import Optional
+
+from systemhud import timed_updates
+from systemhud.lib import acpi
+from systemhud.ui.common import gyr_gradient
+from systemhud.ui.icons import ProgressiveValue, set_icon
+from systemhud.ui.notifications import Notification, progress_bar
+
+PERIOD = 4
+ICON_AC = ""
+ICON_UNKNOWN = "?"
+LEVEL_ICON = ProgressiveValue("")
+
+
+battery = acpi.Battery("BAT0")
+notification = Notification(transient=True)
+
+
+def update_icon() -> None:
+    global battery, LEVEL_ICON
+
+    battery.uncache()
+
+    if battery.status is acpi.Status.FULL:
+        set_icon(ICON_AC)
+    elif battery.status is acpi.Status.CHARGING:
+        set_icon(LEVEL_ICON(battery.capacity))
+    elif battery.status is acpi.Status.DISCHARGING:
+        set_icon(
+            f"%{{F#{gyr_gradient(battery.capacity)}}}"
+            f"{LEVEL_ICON(battery.capacity)}%{{F-}}"
+        )
+    else:
+        set_icon(ICON_UNKNOWN)
+
+
+def summary_notification(*_) -> None:
+    global battery
+
+    if battery.status is acpi.Status.DISCHARGING:
+        notification(
+            title="Battery Discharging",
+            body=(
+                progress_bar(
+                    battery.capacity, color=gyr_gradient(battery.capacity)
+                )
+                + f"{battery.capacity}% -- {battery.remaining} remaining"
+            ),
+            icon=f"battery-level-{int(battery.capacity/10)}0",
+        )
+    elif battery.status is acpi.Status.CHARGING:
+        notification(
+            title="Battery Charging",
+            body=(
+                progress_bar(battery.capacity, color="FFFFFF")
+                + f"{battery.capacity}% -- {battery.remaining} until full"
+            ),
+            icon=f"battery-level-{int(battery.capacity/10)}0-charging",
+        )
+    elif battery.status is acpi.Status.FULL:
+        notification(
+            title="Battery Full",
+            body="Running on AC",
+            icon="ac-adapter",
+        )
+    else:
+        notification(
+            title="Battery UNKNOWN",
+            body="Status Unknown",
+            icon="battery-missing",
+        )
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGUSR1, summary_notification)
+    timed_updates(update_icon, PERIOD)

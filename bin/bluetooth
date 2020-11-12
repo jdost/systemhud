@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+
+"""
+TODO:
+ - USR1 should launch a rofi with buttons for toggling states:
+   - one for controller on/off
+   - one for all paired devices
+   - if off and a device picked, turn on and then connect
+   - if device picked and connected, disconnect
+     - if on battery and no devices connected, power off
+- After input, generate notification on outcome, i.e. connected on/off, etc
+"""
+
+import signal
+from time import sleep
+
+from systemhud import timed_updates
+from systemhud.lib import bluetooth
+from systemhud.ui.icons import set_icon
+
+PERIOD = 5
+ICONS = {"on": "", "off": "", "connected": ""}
+
+
+def update_icon() -> None:
+    global ICONS
+
+    if bluetooth.get_status():
+        if bluetooth.get_devices():
+            set_icon("%{F#33C}" + ICONS["connected"] + "%{F-}")
+        else:
+            set_icon(ICONS["on"])
+    else:
+        set_icon("%{F#666}" + ICONS["off"] + "%{F-}")
+
+
+def summary_notification(*_) -> None:
+    pass
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGUSR1, summary_notification)
+    timed_updates(update_icon, PERIOD)

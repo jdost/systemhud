@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+
+import sys
+
+from systemhud.lib import screen
+from systemhud.ui.notifications import TrackedNotification, progress_bar
+
+BAR_COLOR = "CCCCCC"
+
+
+def get_icon(n: int) -> str:
+    if n == 100:
+        l = "full"
+    else:
+        l = ["low", "medium", "high"][int(n * 3 / 100)]
+
+    return f"notification-display-brightness-{l}"
+
+
+backlight = screen.Backlight()
+
+
+def show_notification() -> None:
+    global backlight
+    notification = TrackedNotification(name="brightness")
+    notification.transient = True
+    notification(
+        "Screen Brightness",
+        progress_bar(backlight.rlevel, color=BAR_COLOR),
+        get_icon(backlight.rlevel),
+    )
+
+
+if len(sys.argv) > 1:
+    delta = sys.argv[1]
+    backlight.rset(backlight.rlevel + int(delta))
+
+show_notification()
