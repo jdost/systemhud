@@ -35,7 +35,7 @@ class EqDots:
 
     def __call__(self, v: int) -> str:
         if v == 0:
-            return f"%{{F#{self.zero_color}}}{self.levels[0]}%{{F-}}"
+            return f"%{{F#{self.zero_color}}}{self.ICONS[0]}%{{F-}}"
 
         dots = ""
         for threshold, color, icon in zip(self.levels, self.colors, self.ICONS):

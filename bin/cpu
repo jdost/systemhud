@@ -37,7 +37,7 @@ GRADIENT = ProgressiveValue(
 ICON = ""
 NOTIFICATION_ROWS = ["usage", "user", "system", "nice", "iowait", "steal"]
 TOP_PROC_COUNT = 5
-NOTIFICATION = Notification(transient=True)
+NOTIFICATION = Notification(transient=True, timeout=4000)
 
 
 def update_icon() -> None:

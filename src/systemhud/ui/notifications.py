@@ -27,11 +27,13 @@ class Notification:
         name: str = "polybar",
         icon: Optional[str] = None,
         transient: bool = False,
+        timeout: int = 4000,
     ):
         self.name = name
         self.icon = icon
-        self.transient = transient
+        self._transient = transient
         self._notification_ref = None
+        self._timeout = timeout
 
     @property
     def ref(self) -> Any:
@@ -44,10 +46,33 @@ class Notification:
             Notify.init(self.name)
 
             self._notification_ref = Notify.Notification.new("", "", "")
-            if self.transient:
-                self._set_transient()
+            self._set_transient()
 
         return self._notification_ref
+
+    @property
+    def timeout(self) -> int:
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, v: int) -> None:
+        self._timeout = v
+        self._set_timeout()
+
+    def _set_timeout(self) -> None:
+        if not self._notification_ref:
+            return
+
+        self._notification_ref.set_timeout(self._timeout)
+
+    @property
+    def transient(self) -> bool:
+        return self._transient
+
+    @transient.setter
+    def transient(self, v: bool) -> None:
+        self._transient = v
+        self._set_transient()
 
     def _set_transient(self) -> None:
         if not self._notification_ref:
@@ -56,7 +81,7 @@ class Notification:
         from gi.repository import GLib
 
         self._notification_ref.set_hint(
-            "transient", GLib.Variant("b", self.transient)
+            "transient", GLib.Variant("b", self._transient)
         )
 
     def __call__(
@@ -64,9 +89,12 @@ class Notification:
         title: str,
         body: str,
         icon: Optional[str] = None,
+        timeout: Optional[int] = None,
     ):
+        timeout = timeout or self.timeout
         icon = icon or self.icon
         self.ref.update(title, body, icon)
+        self.timeout = timeout
         self.ref.show()
 
 
@@ -79,12 +107,16 @@ class TrackedNotification(Notification):
         super().__init__(name)
 
     def __call__(
-        self, title: str, body: str, icon: Optional[str] = None
+        self,
+        title: str,
+        body: str,
+        icon: Optional[str] = None,
+        timeout: Optional[int] = None,
     ) -> None:
         if self.id_file.exists():
             self.ref.set_property("id", int(self.id_file.read_text()))
         else:
             self.id_file.touch()
 
-        super().__call__(title, body, icon)
+        super().__call__(title, body, icon, timeout)
         self.id_file.write_text(str(self.ref.props.id))

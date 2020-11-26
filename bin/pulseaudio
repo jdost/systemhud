@@ -27,6 +27,7 @@ NOTIFICATION = Notification(
     "pulsemonitor",
     icon="audio-speakers",
     transient=True,
+    timeout=2000,
 )
 
 

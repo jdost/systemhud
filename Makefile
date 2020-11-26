@@ -39,7 +39,3 @@ black: venv
 
 shell:
 	${PYTHON}
-
-install:
-	@python3 -m venv --system-site-packages --prompt sysHUD ~/.local/systemhud
-	@~/.local/systemhud/bin/python -m pip install -U -e src/

@@ -7,7 +7,7 @@ from typing import Optional
 
 from systemhud import timed_updates
 from systemhud.lib import acpi
-from systemhud.ui.common import gyr_gradient
+from systemhud.ui.common import ryg_gradient
 from systemhud.ui.icons import ProgressiveValue, set_icon
 from systemhud.ui.notifications import Notification, progress_bar
 
@@ -18,7 +18,7 @@ LEVEL_ICON = ProgressiveValue("")
 
 
 battery = acpi.Battery("BAT0")
-notification = Notification(transient=True)
+notification = Notification(transient=True, timeout=2000)
 
 
 def update_icon() -> None:
@@ -32,7 +32,7 @@ def update_icon() -> None:
         set_icon(LEVEL_ICON(battery.capacity))
     elif battery.status is acpi.Status.DISCHARGING:
         set_icon(
-            f"%{{F#{gyr_gradient(battery.capacity)}}}"
+            f"%{{F#{ryg_gradient(battery.capacity)}}}"
             f"{LEVEL_ICON(battery.capacity)}%{{F-}}"
         )
     else:
@@ -47,7 +47,7 @@ def summary_notification(*_) -> None:
             title="Battery Discharging",
             body=(
                 progress_bar(
-                    battery.capacity, color=gyr_gradient(battery.capacity)
+                    battery.capacity, color=ryg_gradient(battery.capacity)
                 )
                 + f"{battery.capacity}% -- {battery.remaining} remaining"
             ),
