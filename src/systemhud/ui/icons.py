@@ -1,5 +1,5 @@
 from sys import stdout
-from typing import Sequence
+from typing import Optional, Sequence
 
 
 class ProgressiveValue:
@@ -12,7 +12,17 @@ class ProgressiveValue:
         return self.progression[min(idx, self._length - 1)]
 
 
-def set_icon(icon: str) -> None:
+def set_icon(
+    icon: str,
+    foreground: Optional[str] = None,
+    background: Optional[str] = None,
+) -> None:
+    out = icon
+    if foreground:
+        out = f"%{{F#{foreground}}}{out}%{{F-}}"
+    if background:
+        out = f"%{{B#{background}}}{out}%{{B-}}"
+
     print(icon)
     stdout.flush()
 
@@ -41,8 +51,9 @@ class EqDots:
             return f"%{{F#{self.zero_color}}}{self.ICONS[0]}%{{F-}}"
 
         dots = ""
-        for min_threshold, max_threshold, color, icon in \
-            zip(self.levels, self.levels[1:], self.colors, self.ICONS):
+        for min_threshold, max_threshold, color, icon in zip(
+            self.levels, self.levels[1:], self.colors, self.ICONS
+        ):
             if v > max_threshold:
                 if dots:
                     dots += "%{O-11}"
@@ -54,7 +65,14 @@ class EqDots:
                 if dots:
                     dots += "%{O-11}"
                 # basically 8*(percent between min and max) + 8
-                internal_bracket = int((v - min_threshold) * 8 / (max_threshold - min_threshold)) + 8
+                internal_bracket = (
+                    int(
+                        (v - min_threshold)
+                        * 8
+                        / (max_threshold - min_threshold)
+                    )
+                    + 8
+                )
                 # The opacity needs to be 2 characters, I also uppercase it to
                 # be consistent with the other hex characters
                 opacity = hex(internal_bracket - 1)[-1].upper() * 2

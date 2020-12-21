@@ -65,24 +65,26 @@ class Notification:
 
         self._notification_ref.set_timeout(self._timeout)
 
-    @property
-    def transient(self) -> bool:
-        return self._transient
-
-    @transient.setter
-    def transient(self, v: bool) -> None:
-        self._transient = v
-        self._set_transient()
-
     def _set_transient(self) -> None:
         if not self._notification_ref:
+            return
+
+        if not self._transient:
             return
 
         from gi.repository import GLib
 
         self._notification_ref.set_hint(
-            "transient", GLib.Variant("b", self._transient)
+            "transient", GLib.Variant("i", self._transient)
         )
+
+    def _set_image(self, i: str) -> None:
+        if not self._notification_ref:
+            return
+
+        from gi.repository import GLib
+
+        self._notification_ref.set_hint("image-path", GLib.Variant("s", i))
 
     def __call__(
         self,
@@ -90,21 +92,24 @@ class Notification:
         body: str,
         icon: Optional[str] = None,
         timeout: Optional[int] = None,
+        image: Optional[str] = None,
     ):
         timeout = timeout or self.timeout
         icon = icon or self.icon
         self.ref.update(title, body, icon)
+        if image:
+            self._set_image(image)
         self.timeout = timeout
         self.ref.show()
 
 
 class TrackedNotification(Notification):
-    def __init__(self, name: str):
+    def __init__(self, name: str, **kwargs: Any):
         self.id_file = Path(f"/var/run/user/{getuid()}/notifications/{name}.id")
         if not self.id_file.parent.is_dir():
             self.id_file.parent.mkdir(parents=True)
 
-        super().__init__(name)
+        super().__init__(name, **kwargs)
 
     def __call__(
         self,
@@ -112,11 +117,12 @@ class TrackedNotification(Notification):
         body: str,
         icon: Optional[str] = None,
         timeout: Optional[int] = None,
+        image: Optional[str] = None,
     ) -> None:
         if self.id_file.exists():
             self.ref.set_property("id", int(self.id_file.read_text()))
         else:
             self.id_file.touch()
 
-        super().__call__(title, body, icon, timeout)
+        super().__call__(title, body, icon, timeout, image)
         self.id_file.write_text(str(self.ref.props.id))

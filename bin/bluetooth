@@ -13,31 +13,121 @@ TODO:
 
 import signal
 from time import sleep
+from typing import Dict
 
-from systemhud import timed_updates
+from systemhud import register_signal, run, update_stream
 from systemhud.lib import bluetooth
+from systemhud.ui import rofi
 from systemhud.ui.icons import set_icon
+from systemhud.ui.notifications import Notification
 
-PERIOD = 5
-ICONS = {"on": "", "off": "", "connected": ""}
+ICONS = {"on": "", "off": "%{F#666}%{F-}", "connected": "%{F#88F}%{F-}"}
+notifications: Dict[str, Notification] = {}
+controller_notification = Notification(
+    "bluetooth", icon="bluetooth", timeout=1500, transient=False
+)
 
 
-def update_icon() -> None:
+async def handle_update() -> None:
     global ICONS
 
-    if bluetooth.get_status():
-        if bluetooth.get_devices():
-            set_icon("%{F#33C}" + ICONS["connected"] + "%{F-}")
+    if await bluetooth.get_status():
+        if await bluetooth.get_devices():
+            set_icon("%{F#88F}" + ICONS["connected"] + "%{F-}")
         else:
             set_icon(ICONS["on"])
     else:
         set_icon("%{F#666}" + ICONS["off"] + "%{F-}")
 
 
-def summary_notification(*_) -> None:
-    pass
+async def menu_popup(*_) -> None:
+    devices = await bluetooth.get_devices()
+    status = bool(await bluetooth.get_status())
+    _CONTROLLER_KEY = "__CONTROLLER__"
+    entries = [
+        rofi.Entry(
+            "Controller", active=status, icon="bluetooth", value=_CONTROLLER_KEY
+        )
+    ]
+    entries += [
+        rofi.Entry(
+            dev.name, active=dev.connected, icon=dev.icon, value=dev.device_id
+        )
+        for dev in devices.values()
+    ]
+
+    selection = await rofi.rofi(entries, theme="icons")
+    if not selection:
+        return
+    if selection.value == _CONTROLLER_KEY:
+        await bluetooth.toggle()
+    else:
+        await devices[selection.value].toggle()
+
+
+async def main() -> None:
+    register_signal(signal.SIGUSR1, menu_popup)
+
+    status = bool(await bluetooth.get_status())
+    devices: Dict[str, bluetooth.Device] = (
+        await bluetooth.get_devices() if status else {}
+    )
+
+    if not status:
+        set_icon(ICONS["off"])
+    elif any([d.connected for d in devices.values()]):
+        set_icon(ICONS["connected"])
+    else:
+        set_icon(ICONS["on"])
+
+    async for line in update_stream("bluetoothctl"):
+        status, dev_type, dev_id, meta = bluetooth.parse_bluetoothctl_logline(
+            line
+        )
+
+        if dev_type is bluetooth.BluetoothType.CONTROLLER:
+            try:
+                k, v = meta.split(":", 1)
+            except ValueError:
+                continue
+
+            if k.strip() == "Powered":
+                on = v.strip() == "yes"
+                controller_notification(
+                    title="Bluetooth Controller",
+                    body=("Powered On" if on else "Powered Off"),
+                    image=("bluetooth-active" if on else "bluetooth-disabled"),
+                )
+                set_icon(ICONS["on" if on else "off"])
+                if on:
+                    devices = await bluetooth.get_devices()
+        elif dev_type is bluetooth.BluetoothType.DEVICE:
+            # This is not a paired devices, TODO support handling pairing a
+            # device
+            if dev_id not in devices:
+                continue
+
+            if status is bluetooth.BluetoothCtl.Status.CHANGED:
+                if await devices[dev_id].update():
+                    device = devices[dev_id]
+                    if device.connected:
+                        set_icon(ICONS["connected"])
+                    elif not any([d.connected for d in devices.values()]):
+                        set_icon(ICONS["on"])
+
+                    if device.device_id not in notifications:
+                        notifications[device.device_id] = Notification(
+                            "bluetooth", icon="bluetooth", timeout=1500
+                        )
+
+                    notifications[device.device_id](
+                        title=device.name,
+                        body="Connected"
+                        if device.connected
+                        else "Disconnected",
+                        image=device.icon,
+                    )
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGUSR1, summary_notification)
-    timed_updates(update_icon, PERIOD)
+    run(main)

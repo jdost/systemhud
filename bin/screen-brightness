@@ -22,9 +22,11 @@ backlight = screen.Backlight()
 
 def show_notification() -> None:
     global backlight
-    notification = TrackedNotification(name="brightness")
-    notification.transient = True
-    notification.timeout = 2000
+    notification = TrackedNotification(
+        name="brightness",
+        transient=True,
+        timeout=2000,
+    )
     notification(
         "Screen Brightness",
         progress_bar(backlight.rlevel, color=BAR_COLOR),

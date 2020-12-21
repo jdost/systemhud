@@ -1,0 +1,29 @@
+configuration {
+    show-icons: true;
+    icon-theme: "Papirus";
+    fullscreen: false;
+    hide-scrollbar: true;
+
+    me-select-entry: "MouseDPrimary";
+    me-accept-entry: "MousePrimary";
+}
+
+* {
+    font: "Hack Nerd Font Mono 12";
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+window {
+    transparency: "real";
+    border-radius: 12px;
+    location: northeast;
+    y-offset: 30px;
+    x-offset: -10px;
+}
+
+mainbox {
+    background-color: rgba(5, 5, 5, 0.4);
+    border-radius: 1%;
+}

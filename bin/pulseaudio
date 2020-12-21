@@ -8,10 +8,11 @@ TODO:
 import enum
 import signal
 import subprocess
+from datetime import datetime, timedelta
 from time import sleep
 from typing import Optional
 
-from systemhud import timed_updates
+from systemhud import register_signal, run, timed_updates
 from systemhud.lib import pulseaudio
 from systemhud.ui.icons import dots, set_icon
 from systemhud.ui.notifications import Notification, progress_bar
@@ -29,25 +30,45 @@ NOTIFICATION = Notification(
     transient=True,
     timeout=2000,
 )
+last_refresh = datetime.now()
+REFRESH_PERIOD = timedelta(minutes=5)
 
 
-def update_icon() -> None:
-    global SINK, SOURCE
+async def update_icon() -> None:
+    global last_refresh
+
+    if datetime.now() - last_refresh > REFRESH_PERIOD:
+        await refresh()
+
     set_icon(
-        f"{dots(SINK.volume)}%{{O-7}}{dots(SOURCE.volume)}%{{O-11}}%{{F-}}"
+        f"{dots(await SINK.volume)}%{{O-7}}{dots(await SOURCE.volume)}%{{O-11}}%{{F-}}"
     )
 
 
-def summary_notification(*_) -> None:
+async def refresh() -> None:
+    global last_refresh
+    last_refresh = datetime.now()
+
+    await SINK.update()
+    await SOURCE.update()
+
+
+async def summary_notification(*_) -> None:
     global SINK, NOTIFICATION
     NOTIFICATION(
         title=SINK.name,
         body=progress_bar(SINK.volume, color=PROGRESS_BAR_COLOR),
     )
-    update_icon()
+    await update_icon()
+
+
+async def main() -> None:
+    await refresh()
+    register_signal(signal.SIGUSR1, summary_notification)
+    register_signal(signal.SIGHUP, refresh)
+    await timed_updates(update_icon, PERIOD)
 
 
 if __name__ == "__main__":
     set_pidfile("pulseaudio")
-    signal.signal(signal.SIGUSR1, summary_notification)
-    timed_updates(update_icon, PERIOD)
+    run(main)

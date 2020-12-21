@@ -1,7 +1,8 @@
-import subprocess
 from enum import Enum
 from pathlib import Path
 from typing import Optional
+
+from systemhud.util import capture
 
 
 class Status(Enum):
@@ -46,14 +47,11 @@ class Battery:
         return self._capacity
 
     @property
-    def remaining(self) -> str:
+    async def remaining(self) -> str:
         if self.status is Status.FULL:
             return ""
         elif self.status is Status.UNKNOWN:
             return "UNKNOWN"
 
-        acpi_output = subprocess.run(
-            ["acpi", "-b"], stdout=subprocess.PIPE
-        ).stdout.decode("utf-8")
-
+        acpi_output = await capture("acpi -b", split=False)
         return acpi_output.rsplit(",", 1)[1].strip().split(" ", 1)[0]

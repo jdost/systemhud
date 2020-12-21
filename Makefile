@@ -30,11 +30,13 @@ format: isort black
 isort: venv
 	@echo " >> Formatting imports in codebase with isort"
 	@${PYTHON} -m isort src
+	@${PYTHON} -m isort bin
 	@echo ""
 
 black: venv
 	@echo " >> Formatting codebase with black"
 	@${PYTHON} -m black src
+	@${PYTHON} -m black bin
 	@echo ""
 
 shell:

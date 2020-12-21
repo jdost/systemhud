@@ -3,7 +3,7 @@
 import signal
 import subprocess
 
-from systemhud import timed_updates
+from systemhud import register_signal, run, timed_updates
 from systemhud.lib import cpu
 from systemhud.ui.common import gyr_gradient
 from systemhud.ui.icons import ProgressiveValue, set_icon
@@ -40,7 +40,7 @@ TOP_PROC_COUNT = 5
 NOTIFICATION = Notification(transient=True, timeout=4000)
 
 
-def update_icon() -> None:
+async def update_icon() -> None:
     v = cpu.diffs(update=True)
     set_icon(f"%{{F#{gyr_gradient(v[0].usage_percent)}}}{ICON}%{{F-}}")
 
@@ -104,6 +104,10 @@ def summary_notification(*_) -> None:
     )
 
 
+async def main() -> None:
+    register_signal(signal.SIGUSR1, summary_notification)
+    await timed_updates(update_icon, PERIOD)
+
+
 if __name__ == "__main__":
-    signal.signal(signal.SIGUSR1, summary_notification)
-    timed_updates(update_icon, PERIOD)
+    run(main)
