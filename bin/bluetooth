@@ -28,18 +28,6 @@ controller_notification = Notification(
 )
 
 
-async def handle_update() -> None:
-    global ICONS
-
-    if await bluetooth.get_status():
-        if await bluetooth.get_devices():
-            set_icon("%{F#88F}" + ICONS["connected"] + "%{F-}")
-        else:
-            set_icon(ICONS["on"])
-    else:
-        set_icon("%{F#666}" + ICONS["off"] + "%{F-}")
-
-
 async def menu_popup(*_) -> None:
     devices = await bluetooth.get_devices()
     status = bool(await bluetooth.get_status())
