@@ -20,16 +20,22 @@ class BluetoothType(ReversableEnum):
 
 
 class Device:
+    # For some reason, my bluetooth headphones identify as an audio card, which
+    # is kind of annoying from a UI perspective, so add in a translation table
+    # for these problematic icon identifiers
+    ICONS_TRANS = {
+        "audio-card": "audio-headphones",
+    }
     device_id: str
     name: str
-    icon: str
+    _icon: str
     connected: bool = False
 
     def __init__(self, device_id: str):
         self.device_id = device_id
         self.name = ""
         self.connected = False
-        self.icon = ""
+        self._icon = ""
 
     async def _get_info(self) -> None:
         for line in await capture(f"bluetoothctl info {self.device_id}"):
@@ -44,7 +50,11 @@ class Device:
             elif k == "Connected":
                 self.connected = v.strip() == "yes"
             elif k == "Icon":
-                self.icon = v.strip()
+                self._icon = v.strip()
+
+    @property
+    def icon(self) -> str:
+        return self.ICONS_TRANS.get(self._icon, self._icon)
 
     async def update(self) -> bool:
         """Update the info for this device, if the connection status changed,

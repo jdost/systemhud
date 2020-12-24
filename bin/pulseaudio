@@ -2,12 +2,16 @@
 
 """
 TODO:
- - USR1 will pop up a rofi with two scripts, one to list sinks, one sources
+ - overhaul the devices, need to get a list of all, with some properties
+ - support some wrapped actions
+ - switch to using `pactl subscribe` for the event stream, parsing the lines
+ - USR2 will pop up a rofi with outputs plus option to switch to inputs
+   ^ popup takes an input, so it can call itself with the switch
+ - USR1 will popup an icon rofi with basic mute toggle and volume bumps (+-10)
 """
 
 import enum
 import signal
-import subprocess
 from datetime import datetime, timedelta
 from time import sleep
 from typing import Optional

@@ -29,6 +29,8 @@ def colored_number(n: int) -> str:
 
 
 async def summary_notification(*_) -> None:
+    global NOTIFICATION_ROWS, NOTIFICATION
+
     body = (
         "<b><big>Usage Per Core:</big></b>\n"
         "<span font_desc='Anonymice Nerd Font Mono'>"

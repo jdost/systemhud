@@ -2,13 +2,8 @@
 
 """
 TODO:
- - USR1 should launch a rofi with buttons for toggling states:
-   - one for controller on/off
-   - one for all paired devices
-   - if off and a device picked, turn on and then connect
-   - if device picked and connected, disconnect
-     - if on battery and no devices connected, power off
-- After input, generate notification on outcome, i.e. connected on/off, etc
+- fix the icon sizing issue, the bluetooth glyph is different height between
+  the three states, probably need different fonts?
 """
 
 import signal
@@ -21,10 +16,10 @@ from systemhud.ui import rofi
 from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
 
-ICONS = {"on": "", "off": "%{F#666}%{F-}", "connected": "%{F#88F}%{F-}"}
+ICONS = {"on": "", "off": "%{F#999}%{F-}", "connected": "%{F#5AF}%{F-}"}
 notifications: Dict[str, Notification] = {}
 controller_notification = Notification(
-    "bluetooth", icon="bluetooth", timeout=1500, transient=False
+    "bluetooth", icon="bluetooth", timeout=1500, transient=True
 )
 
 
@@ -50,6 +45,10 @@ async def menu_popup(*_) -> None:
     if selection.value == _CONTROLLER_KEY:
         await bluetooth.toggle()
     else:
+        # Turn on the controller if it is off, otherwise we *know* the toggle
+        # will fail
+        if not status:
+            await bluetooth.toggle()
         await devices[selection.value].toggle()
 
 
@@ -95,7 +94,7 @@ async def main() -> None:
             if dev_id not in devices:
                 continue
 
-            if status is bluetooth.BluetoothCtl.Status.CHANGED:
+            if status is bluetooth.BluetoothCtlStatus.CHANGED:
                 if await devices[dev_id].update():
                     device = devices[dev_id]
                     if device.connected:
@@ -103,12 +102,14 @@ async def main() -> None:
                     elif not any([d.connected for d in devices.values()]):
                         set_icon(ICONS["on"])
 
-                    if device.device_id not in notifications:
-                        notifications[device.device_id] = Notification(
+                    n = notifications.setdefault(
+                        device.device_id,
+                        Notification(
                             "bluetooth", icon="bluetooth", timeout=1500
-                        )
-
-                    notifications[device.device_id](
+                        ),
+                    )
+                    n.transient = not device.connected
+                    n(
                         title=device.name,
                         body="Connected"
                         if device.connected

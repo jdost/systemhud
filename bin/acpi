@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 
+"""
+TODO
+ - change the ac adaptor watch to work off of `udevadm` output for the adaptor
+   ^ toggles the timer for level testing
+ - add in some notification events around ac change...
+"""
+
 import signal
-import subprocess
 from time import sleep
 from typing import Optional
 
-from systemhud import timed_updates
+from systemhud import register_signal, run, timed_updates
 from systemhud.lib import acpi
 from systemhud.ui.common import ryg_gradient
 from systemhud.ui.icons import ProgressiveValue, set_icon
@@ -21,7 +27,7 @@ battery = acpi.Battery("BAT0")
 notification = Notification(transient=True, timeout=2000)
 
 
-def update_icon() -> None:
+async def update_icon() -> None:
     global battery, LEVEL_ICON
 
     battery.uncache()
@@ -39,26 +45,28 @@ def update_icon() -> None:
         set_icon(ICON_UNKNOWN)
 
 
-def summary_notification(*_) -> None:
+async def summary_notification(*_) -> None:
     global battery
 
     if battery.status is acpi.Status.DISCHARGING:
+        remaining = await battery.remaining
         notification(
             title="Battery Discharging",
             body=(
                 progress_bar(
                     battery.capacity, color=ryg_gradient(battery.capacity)
                 )
-                + f"{battery.capacity}% -- {battery.remaining} remaining"
+                + f"{battery.capacity}% -- {remaining} remaining"
             ),
             icon=f"battery-level-{int(battery.capacity/10)}0",
         )
     elif battery.status is acpi.Status.CHARGING:
+        remaining = await battery.remaining
         notification(
             title="Battery Charging",
             body=(
                 progress_bar(battery.capacity, color="FFFFFF")
-                + f"{battery.capacity}% -- {battery.remaining} until full"
+                + f"{battery.capacity}% -- {remaining} until full"
             ),
             icon=f"battery-level-{int(battery.capacity/10)}0-charging",
         )
@@ -76,6 +84,10 @@ def summary_notification(*_) -> None:
         )
 
 
+async def main() -> None:
+    register_signal(signal.SIGUSR1, summary_notification)
+    await timed_updates(update_icon, PERIOD)
+
+
 if __name__ == "__main__":
-    signal.signal(signal.SIGUSR1, summary_notification)
-    timed_updates(update_icon, PERIOD)
+    run(main)
