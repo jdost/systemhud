@@ -22,4 +22,10 @@ exec = ~/.local/systemhud/bin/pulseaudio
 click-left = kill -USR1 %pid%
 tail = True
 
+[module/memory]
+type = custom/script
+exec = ~/.local/systemhud/bin/memory
+click-left = kill -USR1 %pid%
+tail = True
+
 ; vim:ft=dosini

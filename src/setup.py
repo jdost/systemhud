@@ -37,5 +37,6 @@ setup(
         "../bin/bluetooth",
         "../bin/cpu",
         "../bin/screen-brightness",
+        "../bin/memory",
     ],
 )
