@@ -1,5 +1,5 @@
 from sys import stdout
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 
 class ProgressiveValue:
@@ -7,8 +7,11 @@ class ProgressiveValue:
         self.progression = progression
         self._length = len(progression)
 
-    def __call__(self, v: int) -> str:
-        idx = int(v / 100 * self._length)
+    def __call__(self, v: Union[int, float]) -> str:
+        if isinstance(v, int):
+            idx = int(v / 100 * self._length)
+        else:
+            idx = int(v * self._length)
         return self.progression[min(idx, self._length - 1)]
 
 
@@ -23,7 +26,7 @@ def set_icon(
     if background:
         out = f"%{{B#{background}}}{out}%{{B-}}"
 
-    print(icon)
+    print(out)
     stdout.flush()
 
 
