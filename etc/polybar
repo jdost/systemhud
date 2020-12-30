@@ -20,6 +20,7 @@ tail = true
 type = custom/script
 exec = ~/.local/systemhud/bin/pulseaudio
 click-left = kill -USR1 %pid%
+click-right = kill -USR2 %pid%
 tail = True
 
 [module/memory]

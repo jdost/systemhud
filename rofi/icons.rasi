@@ -35,3 +35,6 @@ mainbox {
         element active {
             background-color: rgba(50, 250, 50, 0.5);
         }
+        element urgent {
+            background-color: rgba(250, 50, 50, 0.5);
+        }

@@ -49,6 +49,9 @@ class ReversableEnum(enum.Enum):
 
         return None
 
+    def __str__(self) -> str:
+        return self.value
+
 
 @overload
 async def capture(full_cmd: str) -> Sequence[str]:
