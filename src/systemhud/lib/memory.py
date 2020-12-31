@@ -29,7 +29,7 @@ class Memory:
 
     @property
     def used(self) -> int:
-        return self.total - self.free + self.buffered + self.cached
+        return self.total - self.free
 
     @property
     def perc_used(self) -> float:
