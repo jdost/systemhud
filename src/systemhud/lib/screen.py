@@ -22,7 +22,9 @@ class Backlight:
         return int(self.level / self.max_brightness * 100)
 
     def set(self, l: int) -> None:
-        self.level_file.write_text(str(l))
+        if l <= 0 and self.level != 1:
+            l = 1
+        self.level_file.write_text(str(max(l, 0)))
 
     def rset(self, l: int) -> None:
         self.set(int(l / 100 * self.max_brightness))
