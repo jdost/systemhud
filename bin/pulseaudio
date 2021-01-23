@@ -110,7 +110,16 @@ async def device_popup(devs: Optional[pulseaudio.Devices] = None) -> None:
 async def main() -> None:
     register_signal(signal.SIGUSR1, volume_popup)
     register_signal(signal.SIGUSR2, device_popup)
-    await SINKS.update()
+    while True:
+        # On startup, pulse is not always started, this just leaves a filler
+        #  icon until the pulse server starts
+        try:
+            await SINKS.update()
+            break
+        except AssertionError:
+            set_icon("")
+            sleep(5)
+
     await SOURCES.update()
     await update_icon()
 
