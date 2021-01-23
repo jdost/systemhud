@@ -3,3 +3,4 @@ build/
 .mypy_cache/
 dist/
 venv/
+bin/test
