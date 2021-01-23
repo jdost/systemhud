@@ -11,7 +11,7 @@ class BluetoothCtlStatus(ReversableEnum):
 
     @classmethod
     def rlookup(cls, raw: str) -> Optional["BluetoothCtlStatus"]:
-        return super(BluetoothCtlStatus, cls).rlookup(raw.strip("[]"))
+        return super().rlookup(raw.strip("[]"))
 
 
 class BluetoothType(ReversableEnum):

@@ -6,6 +6,7 @@ TODO:
   the three states, probably need different fonts?
 """
 
+import asyncio
 import signal
 from time import sleep
 from typing import Dict
@@ -43,6 +44,10 @@ async def menu_popup(*_) -> None:
     if not selection:
         return
     if selection.value == _CONTROLLER_KEY:
+        if status:
+            await asyncio.gather(
+                *[d.toggle() for d in devices.values() if d.connected]
+            )
         await bluetooth.toggle()
     else:
         # Turn on the controller if it is off, otherwise we *know* the toggle
