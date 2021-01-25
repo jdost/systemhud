@@ -64,9 +64,16 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    notifications.TrackedNotification(
-        name=args.app_name,
-        icon=args.icon,
+
+    (
+        notifications.TrackedNotification
+        if args.app_name
+        else notifications.Notification
+    )(
+        name=args.app_name if args.app_name else "notify-send",
+        icon=args.icon if args.icon else "",
         transient=args.transient,
         timeout=args.expire_time,
-    )(title=args.summary, body=args.body, image=args.image)
+    )(
+        title=args.summary, body=args.body, image=args.image
+    )
