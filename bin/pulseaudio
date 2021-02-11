@@ -48,11 +48,21 @@ async def volume_notification(dev) -> None:
         NOTIFICATION(
             title=dev.name,
             body="Muted",
+            icon=(
+                "audio-speakers"
+                if dev.device_type is pulseaudio.Type.SINK
+                else "audio-input-microphone"
+            ),
         )
     else:
         NOTIFICATION(
             title=dev.name,
             body=progress_bar(dev.volume, color=PROGRESS_BAR_COLOR),
+            icon=(
+                "audio-speakers"
+                if dev.device_type is pulseaudio.Type.SINK
+                else "audio-input-microphone"
+            ),
         )
 
 

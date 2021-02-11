@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import sys
 
 from systemhud.ui import notifications
+
+__VERSION__ = "0.2"
 
 parser = argparse.ArgumentParser(description="create a notification")
 parser.add_argument("summary", metavar="SUMMARY", type=str)
@@ -61,8 +64,18 @@ parser.add_argument(
     type=str,
     help="Path for an image to use in the notification.",
 )
+parser.add_argument(
+    "--progress",
+    metavar="PROGRESS_FILL",
+    type=int,
+    help="Length the progress bar is filled.",
+)
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--version":
+        print(f"notify-send {__VERSION__}")
+        sys.exit(0)
+
     args = parser.parse_args()
 
     (
@@ -75,5 +88,8 @@ if __name__ == "__main__":
         transient=args.transient,
         timeout=args.expire_time,
     )(
-        title=args.summary, body=args.body, image=args.image
+        title=args.summary,
+        body=args.body,
+        image=args.image,
+        progress=args.progress,
     )
