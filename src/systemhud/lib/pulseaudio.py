@@ -52,7 +52,8 @@ class Device:
             channel_percs: List[int] = []
             for channel in metadata["volume"].split(","):
                 _, v = channel.strip().split(":", 1)
-                _, perc, _ = v.strip().split("/", 2)
+                parts = v.strip().split("/")
+                perc = parts[1]
                 channel_percs.append(int(perc.rstrip("% ")))
 
             self._volume = sum(channel_percs) / len(channel_percs)

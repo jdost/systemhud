@@ -17,7 +17,7 @@ from systemhud.ui import rofi
 from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
 
-ICONS = {"on": "", "off": "%{F#999}%{F-}", "connected": "%{F#5AF}%{F-}"}
+ICONS = {"on": ("", None), "off": ("", "999"), "connected": ("", "5AF")}
 notifications: Dict[str, Notification] = {}
 controller_notification = Notification(
     "bluetooth", icon="bluetooth", timeout=1500, transient=True
@@ -57,6 +57,14 @@ async def menu_popup(*_) -> None:
         await devices[selection.value].toggle()
 
 
+def icon(state: str) -> None:
+    if state not in ICONS:
+        raise KeyError
+
+    icon, color = ICONS[state]
+    set_icon(icon, foreground=color)
+
+
 async def main() -> None:
     register_signal(signal.SIGUSR1, menu_popup)
 
@@ -66,13 +74,13 @@ async def main() -> None:
     )
 
     if not status:
-        set_icon(ICONS["off"])
+        icon("off")
     elif any([d.connected for d in devices.values()]):
-        set_icon(ICONS["connected"])
+        icon("connected")
     else:
-        set_icon(ICONS["on"])
+        icon("on")
 
-    async for line in update_stream("bluetoothctl"):
+    async for line in await update_stream("bluetoothctl"):
         status, dev_type, dev_id, meta = bluetooth.parse_bluetoothctl_logline(
             line
         )
@@ -90,7 +98,7 @@ async def main() -> None:
                     body=("Powered On" if on else "Powered Off"),
                     image=("bluetooth-active" if on else "bluetooth-disabled"),
                 )
-                set_icon(ICONS["on" if on else "off"])
+                icon("on" if on else "off")
                 if on:
                     devices = await bluetooth.get_devices()
         elif dev_type is bluetooth.BluetoothType.DEVICE:
@@ -99,13 +107,13 @@ async def main() -> None:
             if dev_id not in devices:
                 continue
 
-            if status is bluetooth.BluetoothCtlStatus.CHANGED:
+            if status is bluetooth.Status.CHANGED:
                 if await devices[dev_id].update():
                     device = devices[dev_id]
                     if device.connected:
-                        set_icon(ICONS["connected"])
+                        icon("connected")
                     elif not any([d.connected for d in devices.values()]):
-                        set_icon(ICONS["on"])
+                        icon("on")
 
                     n = notifications.setdefault(
                         device.device_id,

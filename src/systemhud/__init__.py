@@ -1,12 +1,30 @@
 import asyncio
+import atexit
 import shlex
 import shutil
 from pathlib import Path
 from typing import AsyncGenerator, Awaitable, Callable, List
 
 from systemhud.errors import ExecutableNotFound
+from systemhud.util import start, stream
 
 PKG_ROOT = list(Path(__file__).resolve().parents)[2]
+_streams: List[asyncio.subprocess.Process] = []
+
+
+def _stream_cleaner() -> None:
+    """atexit stream terminator
+    We spawn indefinite subprocess streams that like to hang around after this
+    process restarts, so this attempts to terminate all those still running
+    when the process closes (hopefully)
+    """
+    for stream in _streams:
+        if stream.returncode is not None:
+            continue
+        stream.terminate()
+
+
+atexit.register(_stream_cleaner)
 
 
 async def timed_updates(
@@ -21,28 +39,9 @@ async def timed_updates(
 
 
 async def update_stream(full_cmd: str) -> AsyncGenerator[str, None]:
-    cmd = shlex.split(full_cmd)
-    binary = shutil.which(cmd[0])
-    if binary is None:
-        raise ExecutableNotFound(cmd[0])
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-
-    assert proc.stdout is not None
-
-    try:
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-
-            yield line.decode("utf-8").strip()
-    except KeyboardInterrupt:
-        proc.kill()
+    proc = await start(full_cmd, pipe=True)
+    _streams.append(proc)
+    return stream(proc)
 
 
 def async_updater(handler: Callable[[], Awaitable[None]]) -> None:

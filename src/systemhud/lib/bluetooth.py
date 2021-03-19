@@ -1,10 +1,10 @@
 import asyncio
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 from systemhud.util import ReversableEnum, capture, run, strip_ansi
 
 
-class BluetoothCtlStatus(ReversableEnum):
+class Status(ReversableEnum):
     STARTED_PAIRING = "NEW"
     STOPPED_PAIRING = "DEL"
     CHANGED = "CHG"
@@ -124,7 +124,7 @@ async def toggle() -> None:
 
 def parse_bluetoothctl_logline(
     raw_msg: str,
-) -> Tuple[Optional[BluetoothCtlStatus], Optional[BluetoothType], str, str]:
+) -> Tuple[Optional[Status], Optional[BluetoothType], str, str]:
     raw_line = raw_msg.split("\r")[-1]
     line = strip_ansi(raw_line)
     if not line.startswith("["):
@@ -135,7 +135,7 @@ def parse_bluetoothctl_logline(
     except ValueError:
         return None, None, "", ""
 
-    status = BluetoothCtlStatus.rlookup(raw_status)
+    status = Status.rlookup(raw_status.strip("[]"))
     dev_type = BluetoothType.rlookup(raw_type)
 
     return status, dev_type, dev_id, misc

@@ -133,7 +133,7 @@ async def main() -> None:
     await SOURCES.update()
     await update_icon()
 
-    async for line in update_stream("pactl subscribe"):
+    async for line in await update_stream("pactl subscribe"):
         evt, dev_type, dev_id = pulseaudio.parse_event(line)
 
         if dev_type is None:
