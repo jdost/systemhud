@@ -3,7 +3,7 @@
 import asyncio
 import signal
 from time import sleep
-from typing import Dict
+from typing import Dict, Optional
 
 from systemhud import register_signal, run, update_stream
 from systemhud.lib import bluetooth
@@ -48,6 +48,7 @@ async def menu_popup(*_) -> None:
         # will fail
         if not status:
             await bluetooth.toggle()
+        assert selection.value in devices
         await devices[selection.value].toggle()
 
 
@@ -62,7 +63,7 @@ def icon(state: str) -> None:
 async def main() -> None:
     register_signal(signal.SIGUSR1, menu_popup)
 
-    status = bool(await bluetooth.get_status())
+    status: bool = await bluetooth.get_status()
     devices: Dict[str, bluetooth.Device] = (
         await bluetooth.get_devices() if status else {}
     )
@@ -75,9 +76,12 @@ async def main() -> None:
         icon("on")
 
     async for line in await update_stream("bluetoothctl"):
-        status, dev_type, dev_id, meta = bluetooth.parse_bluetoothctl_logline(
-            line
-        )
+        (
+            dev_status,
+            dev_type,
+            dev_id,
+            meta,
+        ) = bluetooth.parse_bluetoothctl_logline(line)
 
         if dev_type is bluetooth.BluetoothType.CONTROLLER:
             try:
@@ -102,7 +106,7 @@ async def main() -> None:
             if dev_id not in devices:
                 continue
 
-            if status is bluetooth.Status.CHANGED:
+            if dev_status is bluetooth.Status.CHANGED:
                 if await devices[dev_id].update():
                     device = devices[dev_id]
                     if device.connected:
@@ -116,7 +120,6 @@ async def main() -> None:
                             "bluetooth", icon="bluetooth", timeout=1500
                         ),
                     )
-                    n.transient = not device.connected
                     n(
                         title=device.name,
                         body="Connected"

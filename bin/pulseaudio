@@ -93,7 +93,7 @@ async def device_popup(devs: Optional[pulseaudio.Devices] = None) -> None:
             value=_SWITCH_KEY,
         )
     ] + [
-        rofi.Entry(d.name, active=d is devs.default, value=d.device_id)
+        rofi.Entry(d.name, active=d is devs.default, value=str(d.device_id))
         for d in devs.devices.values()
     ]
 
@@ -101,10 +101,12 @@ async def device_popup(devs: Optional[pulseaudio.Devices] = None) -> None:
     if not selection:
         return
 
-    if selection.value == _SWITCH_KEY:
+    assert selection.value is not None
+    selected_value = int(selection.value)
+    if selected_value == _SWITCH_KEY:
         await device_popup(SOURCES if devs is SINKS else SINKS)
-    elif selection.value in devs.devices:
-        await devs.devices[selection.value].set_default()
+    elif selected_value in devs.devices:
+        await devs.devices[selected_value].set_default()
 
 
 async def main() -> None:

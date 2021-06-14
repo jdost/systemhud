@@ -49,7 +49,7 @@ class EqDots:
         self.colors = colors if colors else EqDots.COLORS
         self.zero_color = zero_color or EqDots.ZERO_COLOR
 
-    def __call__(self, v: int) -> str:
+    def __call__(self, v: Union[int, float]) -> str:
         if v == 0:
             return f"%{{F#{self.zero_color}}}{self.ICONS[0]}%{{F-}}"
 

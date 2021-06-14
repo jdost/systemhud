@@ -22,7 +22,7 @@ lint: mypy
 
 mypy: venv
 	@echo " >> Type-checking codebase with mypy"
-	@${PYTHON} -m mypy --ignore-missing-import src
+	@MYPYPATH=src/ ${PYTHON} -m mypy --ignore-missing-import src
 	@echo ""
 
 format: isort black
