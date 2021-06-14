@@ -151,11 +151,13 @@ class TrackedNotification(Notification):
         icon: Optional[str] = None,
         timeout: Optional[int] = None,
         image: Optional[str] = None,
+        transient: Optional[bool] = None,
+        progress: Optional[int] = None,
     ) -> None:
         if self.id_file.exists():
             self.ref.set_property("id", int(self.id_file.read_text()))
         else:
             self.id_file.touch()
 
-        super().__call__(title, body, icon, timeout, image)
+        super().__call__(title, body, icon, timeout, image, transient, progress)
         self.id_file.write_text(str(self.ref.props.id))

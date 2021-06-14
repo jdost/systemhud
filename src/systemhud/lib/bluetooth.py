@@ -10,7 +10,7 @@ class Status(ReversableEnum):
     CHANGED = "CHG"
 
     @classmethod
-    def rlookup(cls, raw: str) -> Optional["BluetoothCtlStatus"]:
+    def rlookup(cls, raw: str) -> Optional["Status"]:
         return super().rlookup(raw.strip("[]"))
 
 

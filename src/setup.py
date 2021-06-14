@@ -29,6 +29,7 @@ setup(
             "black>=19.3b0",
             "isort>=4.3.21",
             "mypy>=0.770",
+            "python-language-server>=0.36.2",
         ]
     },
     scripts=[
