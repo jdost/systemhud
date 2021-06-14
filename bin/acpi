@@ -9,7 +9,7 @@ TODO
 
 import signal
 from time import sleep
-from typing import Optional
+from typing import Optional, Tuple
 
 from systemhud import register_signal, run, timed_updates
 from systemhud.lib import acpi
@@ -17,35 +17,19 @@ from systemhud.ui.common import ryg_gradient
 from systemhud.ui.icons import ProgressiveValue, set_icon
 from systemhud.ui.notifications import Notification, progress_bar
 
-PERIOD = 4
+PERIOD = 10
 ICON_AC = ""
 ICON_UNKNOWN = "?"
-LEVEL_ICON = ProgressiveValue("")
+LAST_LEVEL: Tuple[bool, int] = (False, 0)
+# LEVEL_ICON = ProgressiveValue("")
+LEVEL_ICON = ProgressiveValue("󰂎󰁺󰁻󰁼󰁽󰁾󰁿󰂀󰂁󰂂󰁹")
 
 
 battery = acpi.Battery("BAT0")
-notification = Notification(transient=True, timeout=2000)
+notification = Notification(timeout=2000)
 
 
-async def update_icon() -> None:
-    global battery, LEVEL_ICON
-
-    battery.uncache()
-
-    if battery.status is acpi.Status.FULL:
-        set_icon(ICON_AC)
-    elif battery.status is acpi.Status.CHARGING:
-        set_icon(LEVEL_ICON(battery.capacity))
-    elif battery.status is acpi.Status.DISCHARGING:
-        set_icon(
-            f"%{{F#{ryg_gradient(battery.capacity)}}}"
-            f"{LEVEL_ICON(battery.capacity)}%{{F-}}"
-        )
-    else:
-        set_icon(ICON_UNKNOWN)
-
-
-async def summary_notification(*_) -> None:
+async def show_notification(timeout: int = 2000, transient: bool = False):
     global battery
 
     if battery.status is acpi.Status.DISCHARGING:
@@ -59,6 +43,8 @@ async def summary_notification(*_) -> None:
                 + f"{battery.capacity}% -- {remaining} remaining"
             ),
             icon=f"battery-level-{int(battery.capacity/10)}0",
+            timeout=timeout,
+            transient=transient,
         )
     elif battery.status is acpi.Status.CHARGING:
         remaining = await battery.remaining
@@ -69,19 +55,55 @@ async def summary_notification(*_) -> None:
                 + f"{battery.capacity}% -- {remaining} until full"
             ),
             icon=f"battery-level-{int(battery.capacity/10)}0-charging",
+            timeout=timeout,
+            transient=transient,
         )
     elif battery.status is acpi.Status.FULL:
         notification(
             title="Battery Full",
             body="Running on AC",
             icon="ac-adapter",
+            timeout=timeout,
+            transient=True,
         )
     else:
         notification(
             title="Battery UNKNOWN",
             body="Status Unknown",
             icon="battery-missing",
+            timeout=timeout,
+            transient=True,
         )
+
+
+async def update_icon() -> None:
+    global battery, notification, LEVEL_ICON, LAST_LEVEL
+
+    battery.uncache()
+
+    if battery.status is acpi.Status.FULL:
+        if not LAST_LEVEL[0] or LAST_LEVEL[1] != 100:
+            await show_notification(timeout=1, transient=True)
+            set_icon(ICON_AC)
+    elif battery.status is acpi.Status.CHARGING:
+        if not LAST_LEVEL[0] or LAST_LEVEL[1] != battery.capacity:
+            await show_notification(timeout=1, transient=False)
+            set_icon(LEVEL_ICON(battery.capacity))
+    elif battery.status is acpi.Status.DISCHARGING:
+        if LAST_LEVEL[0] or LAST_LEVEL[1] != battery.capacity:
+            await show_notification(timeout=1, transient=False)
+            set_icon(
+                f"%{{F#{ryg_gradient(battery.capacity)}}}"
+                f"{LEVEL_ICON(battery.capacity)}%{{F-}}"
+            )
+    else:
+        set_icon(ICON_UNKNOWN)
+
+    LAST_LEVEL = battery.status is not acpi.Status.DISCHARGING, battery.capacity
+
+
+async def summary_notification(*_) -> None:
+    await show_notification()
 
 
 async def main() -> None:
