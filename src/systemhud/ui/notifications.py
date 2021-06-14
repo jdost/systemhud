@@ -1,6 +1,6 @@
 from os import getuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 
 def progress_bar(n: int, width: int = 20, color: str = "33CC33") -> str:
@@ -28,12 +28,14 @@ class Notification:
         icon: Optional[str] = None,
         transient: bool = False,
         timeout: int = 4000,
+        hints: Optional[Dict[str, Any]] = None,
     ):
         self.name = name
         self.icon = icon
         self._transient = transient
         self._notification_ref = None
         self._timeout = timeout
+        self.hints = hints if hints else {}
 
     @property
     def ref(self) -> Any:
@@ -47,6 +49,7 @@ class Notification:
 
             self._notification_ref = Notify.Notification.new("", "", "")
             self._set_transient()
+            self._set_hints()
 
         return self._notification_ref
 
@@ -78,6 +81,21 @@ class Notification:
             "transient", GLib.Variant("i", self._transient)
         )
 
+    def _set_hints(self) -> None:
+        if not self._notification_ref:
+            return
+
+        _hint_type_lookup = {bool: "b", float: "d", int: "i", str: "s"}
+
+        from gi.repository import GLib
+
+        for k, v in self.hints.items():
+            type_str = _hint_type_lookup.get(type(v))
+            if not type_str:
+                continue
+
+            self._notification_ref.set_hint(k, GLib.Variant(type_str, v))
+
     def _set_image(self, i: str) -> None:
         if not self._notification_ref:
             return
@@ -86,6 +104,14 @@ class Notification:
 
         self._notification_ref.set_hint("image-path", GLib.Variant("s", i))
 
+    def _set_progress(self, l: int) -> None:
+        if not self._notification_ref:
+            return
+
+        from gi.repository import GLib
+
+        self._notification_ref.set_hint("value", GLib.Variant("i", l))
+
     def __call__(
         self,
         title: str,
@@ -93,12 +119,19 @@ class Notification:
         icon: Optional[str] = None,
         timeout: Optional[int] = None,
         image: Optional[str] = None,
+        transient: Optional[bool] = None,
+        progress: Optional[int] = None,
     ):
         timeout = timeout or self.timeout
         icon = icon or self.icon
         self.ref.update(title, body, icon)
         if image:
             self._set_image(image)
+        if progress:
+            self._set_progress(progress)
+        if transient is not None and transient != self._transient:
+            self._transient = transient
+            self._set_transient()
         self.timeout = timeout
         self.ref.show()
 

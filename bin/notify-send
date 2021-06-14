@@ -52,6 +52,7 @@ parser.add_argument(
     metavar="TYPE:NAME:VALUE",
     type=str,
     help="(unsupported) Specifies basic extra data to pass.",
+    action="append",
 )
 parser.add_argument(
     "--transient",
@@ -77,6 +78,12 @@ if __name__ == "__main__":
         sys.exit(0)
 
     args = parser.parse_args()
+    casting_lookup = {"int": int, "string": str, "double": int, "byte": int}
+
+    hints = {}
+    for hint_arg in args.hint:
+        t, k, v = hint_arg.split(":", 3)
+        hints[k] = casting_lookup.get(t, str)(v)
 
     (
         notifications.TrackedNotification
@@ -87,9 +94,9 @@ if __name__ == "__main__":
         icon=args.icon if args.icon else "",
         transient=args.transient,
         timeout=args.expire_time,
+        hints=hints,
     )(
         title=args.summary,
         body=args.body,
         image=args.image,
-        progress=args.progress,
     )
