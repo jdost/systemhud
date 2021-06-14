@@ -59,4 +59,7 @@ def register_signal(
 
 
 def run(runner: Callable[[], Awaitable[None]]) -> None:
-    asyncio.run(runner())
+    try:
+        asyncio.run(runner())
+    except KeyboardInterrupt:
+        pass
