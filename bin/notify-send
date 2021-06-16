@@ -81,7 +81,7 @@ if __name__ == "__main__":
     casting_lookup = {"int": int, "string": str, "double": int, "byte": int}
 
     hints = {}
-    for hint_arg in args.hint:
+    for hint_arg in args.hint or []:
         t, k, v = hint_arg.split(":", 3)
         hints[k] = casting_lookup.get(t, str)(v)
 
