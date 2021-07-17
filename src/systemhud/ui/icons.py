@@ -1,6 +1,8 @@
 from sys import stdout
 from typing import Optional, Sequence, Union
 
+from systemhud.ui import colors
+
 
 class ProgressiveValue:
     def __init__(self, progression: Sequence[str]):
@@ -33,8 +35,13 @@ def set_icon(
 class EqDots:
     ICONS: Sequence[str] = "⡀⠄⠂⠁"
     LEVELS: Sequence[int] = [0, 25, 50, 75, 100]
-    COLORS: Sequence[str] = ["FF0000", "FF6600", "FFFF00", "00FF00"]
-    ZERO_COLOR: str = "666"
+    COLORS: Sequence[str] = [
+        colors.RED,
+        colors.ORANGE,
+        colors.YELLOW,
+        colors.GREEN,
+    ]
+    ZERO_COLOR: str = colors.DARK_GREY
 
     def __init__(
         self,

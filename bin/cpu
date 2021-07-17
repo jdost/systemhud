@@ -4,6 +4,7 @@ import signal
 
 from systemhud import register_signal, run, timed_updates
 from systemhud.lib import cpu
+from systemhud.ui import pango
 from systemhud.ui.common import gyr_gradient
 from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
@@ -25,15 +26,16 @@ async def update_icon() -> None:
 
 def colored_number(n: int) -> str:
     color = gyr_gradient(n)
-    return "<span foreground='#{}'>{:02.0f}</span>".format(color, n)
+    return pango.wrap(f"{n:02.0f}", foreground=color)
 
 
 async def summary_notification(*_) -> None:
     global NOTIFICATION_ROWS, NOTIFICATION
 
     body = (
-        "<b><big>Usage Per Core:</big></b>\n"
-        "<span font_desc='Anonymice Nerd Font Mono'>"
+        pango.wrap("Usage Per Core:", size="large", weight="bold")
+        + "\n"
+        + pango.span_tag(font=pango.MONOSPACE)
     )
 
     cpus = cpu.diffs()
@@ -52,10 +54,14 @@ async def summary_notification(*_) -> None:
             )
         body += "\n"
 
-    body += "</span>"
+    body += pango.CLOSE_TAG
 
-    body += "\n<b><big>Top {} Processes:</big></b>\n".format(TOP_PROC_COUNT)
-    body += "<span font_desc='Anonymice Nerd Font Mono'>"
+    body += "\n"
+    body += pango.wrap(
+        f"Top {TOP_PROC_COUNT} Processes:", size="large", weight="bold"
+    )
+    body += "\n"
+    body += pango.span_tag(font=pango.MONOSPACE)
 
     by_process = []
     for line_raw in await capture("ps -o %cpu,comm,cmd,pid ax --no-headers"):
@@ -71,7 +77,7 @@ async def summary_notification(*_) -> None:
             proc[0], proc[2] if len(proc[2]) < 20 else proc[1], proc[3]
         )
 
-    body += "</span>"
+    body += pango.CLOSE_TAG
     NOTIFICATION(
         title="CPU USAGE",
         body=body,

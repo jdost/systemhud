@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+
+"""
+Features:
+- main loop updates time every second
+- keeps updated cache of upcoming appointments, refreshes every 5 minutes
+- time changes color depending on time to upcoming appointment
+  - default > 20m
+  - yellow > 5m
+  - red > 0m
+  - cyan for 10m after start
+  - will also generate/re-popup notifications for each checkpoint
+- left click will pop up calendar
+- right click will pop up notifs for all upcoming appointments for the day
+"""
+
+import datetime
+import signal
+from typing import Iterator, List, Optional, Tuple
+
+from systemhud import register_signal, run, timed_updates
+from systemhud.lib import calcurse
+from systemhud.ui import calendar, colors
+from systemhud.ui.icons import set_icon
+from systemhud.ui.notifications import Notification
+from systemhud.ui.pango import MONOSPACE, wrap
+
+
+class NextAppointment:
+    def __init__(self):
+        self.appt = None
+
+    async def _get_next(self) -> None:
+        global appointments
+
+        now = datetime.datetime.now()
+        for appointment in await appointments.iter():
+            if appointment.start - now < datetime.timedelta(minutes=-10):
+                continue
+            self.appt = appointment
+            break
+
+    async def _appt(self) -> calcurse.Appointment:
+        if self.appt is None:
+            await self._get_next()
+
+        return self.appt
+
+    @property
+    async def phase_color(self) -> str:
+        now = datetime.datetime.now()
+        time_until = (await self._appt()).start - now
+        if time_until > datetime.timedelta(minutes=20):
+            return ""
+        elif time_until > datetime.timedelta(minutes=5):
+            return colors.YELLOW
+        elif time_until > datetime.timedelta(minutes=0):
+            return colors.RED
+        elif time_until > datetime.timedelta(minutes=-10):
+            return colors.CYAN
+
+        await self._get_next()
+        return await self.phase_color
+
+
+class AppointmentCache:
+    def __init__(self, expiration: datetime.timedelta) -> None:
+        self.cache: List[calcurse.Appointment] = []
+        self.timestamp: datetime.datetime = datetime.datetime.min
+        self.expiration = expiration
+
+    async def _refresh(self) -> None:
+        self.cache = await calcurse.get_appointments(days=30)
+        self.timestamp = datetime.datetime.now()
+
+    async def iter(self):
+        now = datetime.datetime.now()
+        if now - self.timestamp > self.expiration:
+            await self._refresh()
+
+        return self.cache.__iter__()
+
+
+calendar_notification = Notification(
+    "calendar", icon="calendar", transient=True, timeout=4000
+)
+appointments = AppointmentCache(datetime.timedelta(minutes=5))
+next_appointment = NextAppointment()
+
+
+async def update_clock() -> None:
+    global appointments, next_appointment
+
+    now = datetime.datetime.now()
+    set_icon(
+        now.strftime("%H:%M:%S"), foreground=await next_appointment.phase_color
+    )
+
+
+async def show_calendar_notification(*_) -> None:
+    c = calendar.Calendar(datetime.datetime.now())
+    calendar_notification(
+        title=c.label,
+        body=wrap(
+            "\n".join(
+                c.rows([a.start.date() for a in await appointments.iter()])
+            ),
+            font=MONOSPACE,
+            size=14,
+        ),
+    )
+
+
+async def show_schedule_notification(*_) -> None:
+    pass
+
+
+async def main() -> None:
+    register_signal(signal.SIGUSR1, show_calendar_notification)
+    register_signal(signal.SIGUSR2, show_schedule_notification)
+    await timed_updates(update_clock, 1)
+
+
+if __name__ == "__main__":
+    run(main)

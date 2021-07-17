@@ -40,5 +40,6 @@ setup(
         "../bin/screen-brightness",
         "../bin/memory",
         "../bin/notify-send",
+        "../bin/clock",
     ],
 )

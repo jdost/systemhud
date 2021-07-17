@@ -4,6 +4,7 @@ import signal
 
 from systemhud import register_signal, run, timed_updates
 from systemhud.lib import memory
+from systemhud.ui import pango
 from systemhud.ui.common import gyr_gradient
 from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
@@ -36,13 +37,16 @@ async def update_icon() -> None:
 
 async def summary_notification(*_) -> None:
     body = (
-        "<big>"
-        f"     Free: {format_space(MEMORY.free)}B\n"
-        f"     Buffered: {format_space(MEMORY.buffered)}B\n"
-        f"     Cached: {format_space(MEMORY.cached)}B\n"
-        "</big>"
-        f"<b>Top {TOP_PROC_COUNT} Processes:</b>"
-        "<span font_desc='Anonymice Nerd Font Mono'>"
+        pango.wrap(
+            (
+                f"     Free: {format_space(MEMORY.free)}B\n"
+                f"     Buffered: {format_space(MEMORY.buffered)}B\n"
+                f"     Cached: {format_space(MEMORY.cached)}B\n"
+            ),
+            size="large",
+        )
+        + pango.wrap(f"Top {TOP_PROC_COUNT} Processes", weight="bold")
+        + pango.span_tag(font=pango.MONOSPACE)
     )
 
     by_process = []
@@ -56,11 +60,11 @@ async def summary_notification(*_) -> None:
 
     for proc in sorted(by_process, reverse=True)[:TOP_PROC_COUNT]:
         cmd = proc[2] if len(proc[2]) < 20 else proc[1]
-        body += f"\n  {format_space(proc[0])}b <u>{cmd}</u> ({proc[3]})"
+        body += f"\n  {format_space(proc[0])}b {pango.wrap(cmd, underline='single')} ({proc[3]})"
 
     NOTIFICATION(
         title="Memory Usage",
-        body=body + "</span>",
+        body=body + pango.CLOSE_TAG,
     )
 
 

@@ -2,23 +2,22 @@ from os import getuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from systemhud.ui import pango
+
 
 def progress_bar(n: int, width: int = 20, color: str = "33CC33") -> str:
-    bar = (
-        "<span font_desc='monospace' size='large'>"
-        f"<span background='#{color}'>"
-    )
+    bar = pango.span_tag(background=color)
     step_size = int(100 / width)
     progress = n
     for i in range(width):
         if progress <= 0 and progress > step_size * -1:
-            bar += "</span><span background='#666666'>"
+            bar += pango.CLOSE_TAG + pango.span_tag(background="666666")
 
         bar += " "
         progress -= step_size
 
-    bar += "</span></span>\n"
-    return bar
+    bar += pango.CLOSE_TAG
+    return pango.wrap(bar, font=pango.MONOSPACE, size="16") + "\n"
 
 
 class Notification:

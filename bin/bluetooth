@@ -7,11 +7,15 @@ from typing import Dict, Optional
 
 from systemhud import register_signal, run, update_stream
 from systemhud.lib import bluetooth
-from systemhud.ui import rofi
+from systemhud.ui import colors, rofi
 from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
 
-ICONS = {"on": ("󰂯", None), "off": ("󰂲", "999"), "connected": ("󰂱", "5AF")}
+ICONS = {
+    "on": ("󰂯", None),
+    "off": ("󰂲", colors.GREY),
+    "connected": ("󰂱", colors.CYAN),
+}
 notifications: Dict[str, Notification] = {}
 controller_notification = Notification(
     "bluetooth", icon="bluetooth", timeout=1500
