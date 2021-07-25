@@ -101,9 +101,12 @@ class Notification:
 
         from gi.repository import GLib
 
-        self._notification_ref.set_hint(
-            "image-path", GLib.Variant("s", f"file://{i}")
-        )
+        if i.startswith(".") or i.startswith("/"):
+            self._notification_ref.set_hint(
+                "image-path", GLib.Variant("s", f"file://{i}")
+            )
+        else:
+            self._notification_ref.set_hint("image-path", GLib.Variant("s", i))
 
     def _set_progress(self, l: int) -> None:
         if not self._notification_ref:
