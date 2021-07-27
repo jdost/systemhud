@@ -2,15 +2,6 @@
 
 """
 Features:
-- main loop updates time every second
-- keeps updated cache of upcoming appointments, refreshes every 5 minutes
-- time changes color depending on time to upcoming appointment
-  - default > 20m
-  - yellow > 5m
-  - red > 0m
-  - cyan for 10m after start
-  - will also generate/re-popup notifications for each checkpoint
-- left click will pop up calendar
 - right click will pop up notifs for all upcoming appointments for the day
 """
 
@@ -25,42 +16,97 @@ from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
 from systemhud.ui.pango import MONOSPACE, wrap
 
+# ms the notifications show up between phases
+SCHEDULED_NOTIFICATION_TIMEOUT = 15000
+
 
 class NextAppointment:
+    PHASES = [
+        datetime.timedelta(minutes=20),
+        datetime.timedelta(minutes=5),
+        datetime.timedelta(minutes=0),
+        datetime.timedelta(minutes=-10),
+    ]
+    PHASE_COLORS = ["", colors.YELLOW, colors.RED, colors.CYAN]
+    last_phase: int
+
     def __init__(self):
         self.appt = None
+        self._notification = None
+        self.bgcolor = ""
+        self.last_phase = 0
 
-    async def _get_next(self) -> None:
+    async def update(self, current: datetime.datetime) -> None:
+        if self.appt is None or self.last_phase >= len(self.PHASES):
+            await self._get_next(current)
+
+        assert self.appt is not None
+        if self.PHASES[self.last_phase] > (self.appt.start - current):
+            self.last_phase += 1
+            if self.last_phase < len(self.PHASES):
+                self.notification(scheduled=True, relative=True)
+                self.bgcolor = colors.with_opacity(
+                    self.PHASE_COLORS[self.last_phase], opacity=0.3
+                )
+
+    async def _get_next(self, current) -> None:
         global appointments
 
-        now = datetime.datetime.now()
         for appointment in await appointments.iter():
-            if appointment.start - now < datetime.timedelta(minutes=-10):
+            if (appointment.start - current) < self.PHASES[-1]:
                 continue
+
             self.appt = appointment
             break
 
-    async def _appt(self) -> calcurse.Appointment:
-        if self.appt is None:
-            await self._get_next()
+        assert self.appt is not None
 
-        return self.appt
+        self._notification = None
+        self.last_phase = 0
+        time_until = self.appt.start - current
+        while time_until < self.PHASES[self.last_phase]:
+            self.last_phase += 1
+
+        self.bgcolor = colors.with_opacity(
+            self.PHASE_COLORS[self.last_phase], opacity=0.3
+        )
 
     @property
     async def phase_color(self) -> str:
         now = datetime.datetime.now()
-        time_until = (await self._appt()).start - now
-        if time_until > datetime.timedelta(minutes=20):
-            return ""
-        elif time_until > datetime.timedelta(minutes=5):
-            return colors.YELLOW
-        elif time_until > datetime.timedelta(minutes=0):
-            return colors.RED
-        elif time_until > datetime.timedelta(minutes=-10):
-            return colors.CYAN
+        assert self.appt is not None
+        time_until = self.appt.start - now
+        for i, phase in enumerate(self.PHASES):
+            if time_until > phase:
+                return self.PHASE_COLORS[i]
 
-        await self._get_next()
+        await self._get_next(now)
         return await self.phase_color
+
+    def notification(
+        self, scheduled: bool = False, relative: bool = False
+    ) -> None:
+        if self._notification is None:
+            self._notification = Notification(
+                "calendar", icon="calendar", transient=False, timeout=4000
+            )
+
+        body: str
+        if relative:
+            diff = self.appt.start <= datetime.datetime.now()
+            if diff <= 0:
+                body = "Started"
+            else:
+                body = f"Starts in {diff.minutes} minutes..."
+        else:
+            body = f"Starts @ {self.appt.start.strftime('%H:%M')}"
+
+        assert self.appt is not None
+        self._notification(
+            title=self.appt.name,
+            body=body,
+            timeout=SCHEDULED_NOTIFICATION_TIMEOUT if scheduled else 4000,
+        )
 
 
 class AppointmentCache:
@@ -92,8 +138,11 @@ async def update_clock() -> None:
     global appointments, next_appointment
 
     now = datetime.datetime.now()
+    await next_appointment.update(now)
     set_icon(
-        now.strftime("%H:%M:%S"), foreground=await next_appointment.phase_color
+        now.strftime("%H:%M:%S"),
+        background=next_appointment.bgcolor,
+        offset=True,
     )
 
 

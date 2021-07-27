@@ -9,10 +9,13 @@ APT_FORMAT = "%S %m\n"
 class Appointment:
     name: str
     start: datetime.datetime
+    FULL_DAY_FMT = "..:.."
 
     def __init__(self, date: datetime.date, event: str):
         time, name = event.split(" ", 1)
         self.name = name
+        if time == self.FULL_DAY_FMT:
+            time = "00:00"
         self.start = datetime.datetime.combine(
             date,
             datetime.datetime.strptime(time, "%H:%M").time(),

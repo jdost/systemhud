@@ -21,12 +21,20 @@ def set_icon(
     icon: str,
     foreground: Optional[str] = None,
     background: Optional[str] = None,
+    underline: Union[str, bool] = False,
+    offset: bool = False,
 ) -> None:
     out = icon
+    if offset:
+        out = f"  %{{O-11}}{out} %{{O-11}}"
     if foreground:
         out = f"%{{F#{foreground}}}{out}%{{F-}}"
     if background:
         out = f"%{{B#{background}}}{out}%{{B-}}"
+    if underline:
+        out = f"%{{+u}}{out}%{{-u}}"
+        if isinstance(underline, str):
+            out = f"%{{u#{underline}}}{out}%{{u-}}"
 
     print(out)
     stdout.flush()
