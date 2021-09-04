@@ -1,8 +1,6 @@
 configuration {
     show-icons: true;
     icon-theme: "Papirus";
-    fullscreen: false;
-    hide-scrollbar: true;
 
     me-select-entry: "MouseDPrimary";
     me-accept-entry: "MousePrimary";

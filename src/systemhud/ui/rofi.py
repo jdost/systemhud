@@ -71,8 +71,13 @@ async def rofi(
     args += ["-a", ",".join(actives)] if actives else []
     args += ["-mesg", message] if message else []
     if theme == "icons":
-        args += ["-columns", str(len(entries))]
-        args += ["-width", str(len(items) * 5 + 2)]
+        args += [
+            "-theme-str",
+            (
+                f"listview {{ columns: {len(items)}; }} "
+                f"window {{ width: {len(items) * 100}; }}"
+            ),
+        ]
     else:
         args += ["-lines", str(len(items))]
 

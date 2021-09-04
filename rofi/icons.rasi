@@ -26,11 +26,16 @@ mainbox {
             element-icon {
                 padding: 5 0 0 0;
                 size: 48px;
+                background-color: rgba(0, 0, 0, 0);
+                text-color: rgba(0, 0, 0, 0);
+                horizontal-align: 0.5;
             }
             element-text {
                 font: "Hack Nerd Font Mono 8";
                 vertical-align: 0.5;
                 horizontal-align: 0.5;
+                background-color: rgba(0, 0, 0, 0);
+                text-color: inherit;
             }
         element active {
             background-color: rgba(50, 250, 50, 0.5);
