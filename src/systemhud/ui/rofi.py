@@ -65,7 +65,7 @@ async def rofi(
         "-no-config",
         "-dmenu",
         "-theme",
-        str(PKG_ROOT / f"rofi/{theme}.rasi"),
+        str(PKG_ROOT / f"etc/rofi/{theme}.rasi"),
     ]
     args += ["-u", ",".join(urgents)] if urgents else []
     args += ["-a", ",".join(actives)] if actives else []
