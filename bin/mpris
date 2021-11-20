@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+
+import asyncio
+from typing import Dict, Optional
+
+from systemhud import run, update_stream
+from systemhud.lib import mpris
+from systemhud.ui import colors
+from systemhud.ui.icons import set_icon
+from systemhud.ui.notifications import Notification
+
+class Player(mpris.Player):
+    BAR_ICONS = {
+        "ncspot": "阮",
+        "chromium": "輸",
+        "cmus": "ﱘ",
+        "__default__": "ﱘ",
+    }
+    GTK_ICONS = {
+        "ncspot": "spotify-client",
+        "chromium": "youtube",
+        "cmus": "multimedia-audio-player",
+        "__default__": "multimedia-audio-player",
+    }
+    NO_AUTO_NOTIFICATIONS = {"chromium"}
+    status_task: Optional[asyncio.Task]
+    now_playing: Optional[mpris.Track]
+    _notification: Optional[Notification]
+
+    def __init__(self, name: str):
+        self.app = name
+        self.bar_icon = self.BAR_ICONS.get(
+            self.app, self.BAR_ICONS["__default__"]
+        )
+        self.gtk_icon = self.GTK_ICONS.get(
+            self.app, self.GTK_ICONS["__default__"]
+        )
+        super().__init__(name, mpris.Status.UNKNOWN)
+        self._notification = None
+        self.status_task = None
+        self.now_playing = None
+
+    @property
+    def bar_color(self) -> str:
+        if self.status is mpris.Status.PLAYING:
+            return colors.WHITE
+        elif self.status is mpris.Status.PAUSED:
+            return colors.GREY
+        return colors.DARK_GREY
+
+    async def _read_stream(self):
+        loaded = False
+        async for track in self.status_stream():
+            if not track:
+                continue
+
+            self.now_playing = track
+            if self.app not in self.NO_AUTO_NOTIFICATIONS and loaded:
+                self.notification()
+
+            loaded = True
+
+        # clear the task ref when it is closing
+        self.status_task = None
+
+    def update(self, status: mpris.Status) -> bool:
+        changed = super().update(status)
+        if changed and not self.status_task:
+            self.status_task = asyncio.create_task(self._read_stream())
+
+        return changed
+
+    def __str__(self) -> str:
+        return self.bar_icon
+
+    def notification(self) -> None:
+        if not self._notification:
+            self._notification = Notification(
+                name=self.app, icon=self.gtk_icon
+            )
+
+        assert self.now_playing is not None
+        body = str(self.now_playing)
+        album_art: Optional[str] = None
+        if self.now_playing.art:
+            print(f"grabbing art: {self.now_playing.art}")
+            album_art = str(mpris.get_album_art(self.now_playing.art))
+
+        self._notification(
+            title=f"{self.status} ({self.app})",
+            body=body,
+            timeout=4000,
+            image=album_art,
+        )
+
+
+async def main() -> None:
+    players: Dict[str, Player] = {}
+    async for line in await update_stream(mpris.STATUS_STREAM_CMD):
+        player_name, status = mpris.parse_status_logline(line)
+        if player_name not in players:
+            players[player_name] = Player(player_name)
+
+        player = players[player_name]
+        if status is None:
+            continue
+        if not player.update(status):
+            # no status change
+            continue
+
+        active_player: Player = player
+        for p in players.values():
+            if p.status is mpris.Status.PLAYING:
+                if active_player.status is not mpris.Status.PLAYING:
+                    active_player = p
+                elif p.last_updated > active_player.last_updated:
+                    active_player = p
+            elif active_player.status is not mpris.Status.PLAYING:
+                if p.status is active_player.status:
+                    active_player = (
+                        p
+                        if p.last_updated > active_player.last_updated
+                        else active_player
+                    )
+                elif p.status is mpris.Status.PAUSED:
+                    active_player = p
+
+        set_icon(
+            f"{active_player} - {active_player.name}",
+            foreground=active_player.bar_color,
+        )
+
+
+if __name__ == "__main__":
+    run(main)

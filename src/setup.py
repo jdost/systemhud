@@ -41,5 +41,6 @@ setup(
         "../bin/memory",
         "../bin/notify-send",
         "../bin/clock",
+        "../bin/mpris",
     ],
 )
