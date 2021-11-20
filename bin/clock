@@ -7,7 +7,7 @@ Features:
 
 import datetime
 import signal
-from typing import Iterator, List, Optional, Tuple
+from typing import List
 
 from systemhud import register_signal, run, timed_updates
 from systemhud.lib import calcurse
@@ -39,6 +39,13 @@ class NextAppointment:
     async def update(self, current: datetime.datetime) -> None:
         if self.appt is None or self.last_phase >= len(self.PHASES):
             await self._get_next(current)
+        else:
+            time_until = self.appt.start - current
+            if (
+                time_until > datetime.timedelta(minutes=30)
+                and (time_until.seconds % 300 == 0)
+            ):
+                await self._get_next(current)
 
         assert self.appt is not None
         if self.PHASES[self.last_phase] > (self.appt.start - current):
@@ -93,11 +100,13 @@ class NextAppointment:
 
         body: str
         if relative:
-            diff = self.appt.start <= datetime.datetime.now()
-            if diff <= 0:
+            if datetime.datetime.now() > self.appt.start:
                 body = "Started"
             else:
-                body = f"Starts in {diff.minutes} minutes..."
+                minutes = round(
+                    (self.appt.start - datetime.datetime.now()).seconds / 60
+                )
+                body = f"Starts in {minutes} minutes..."
         else:
             body = f"Starts @ {self.appt.start.strftime('%H:%M')}"
 
