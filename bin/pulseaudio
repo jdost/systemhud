@@ -62,7 +62,7 @@ async def volume_popup() -> None:
         [
             rofi.Entry("Decrease", icon="audio-volume-low", value="decrease"),
             rofi.Entry(
-                "Unmute" if dev.muted else "Mute",
+                f"{int(dev.volume)}% / " + ("Unmute" if dev.muted else "Mute"),
                 icon="audio-volume-muted",
                 value="mute",
                 urgent=dev.muted,
