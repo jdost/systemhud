@@ -14,7 +14,7 @@ class Status(ReversableEnum):
         return super().rlookup(raw.strip("[]"))
 
 
-class BluetoothType(ReversableEnum):
+class Type(ReversableEnum):
     DEVICE = "Device"
     CONTROLLER = "Controller"
 
@@ -124,7 +124,7 @@ async def toggle() -> None:
 
 def parse_bluetoothctl_logline(
     raw_msg: str,
-) -> Tuple[Optional[Status], Optional[BluetoothType], str, str]:
+) -> Tuple[Optional[Status], Optional[Type], str, str]:
     raw_line = raw_msg.split("\r")[-1]
     line = strip_ansi(raw_line)
     if not line.startswith("["):
@@ -136,6 +136,6 @@ def parse_bluetoothctl_logline(
         return None, None, "", ""
 
     status = Status.rlookup(raw_status.strip("[]"))
-    dev_type = BluetoothType.rlookup(raw_type)
+    dev_type = Type.rlookup(raw_type)
 
     return status, dev_type, dev_id, misc

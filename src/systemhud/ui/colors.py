@@ -5,6 +5,7 @@ ORANGE = "FF6600"
 DARK_GREY = "666666"
 GREY = "999999"
 CYAN = "55AAFF"
+WHITE = "FFFFFF"
 
 
 def with_opacity(base: str, opacity: float) -> str:

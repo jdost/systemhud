@@ -47,6 +47,7 @@ class Notification:
             Notify.init(self.name)
 
             self._notification_ref = Notify.Notification.new("", "", "")
+            self._notification_ref.set_app_name(self.name)
             self._set_transient()
             self._set_hints()
 
