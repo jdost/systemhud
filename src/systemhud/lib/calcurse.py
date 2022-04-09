@@ -38,10 +38,10 @@ async def get_appointments(days: int = 1) -> List[Appointment]:
     for line in await capture(
         f'calcurse -Q --filter-type cal --days {days} --format-apt="{APT_FORMAT}"'
     ):
-        if date is None:
-            date = datetime.datetime.strptime(line, "%m/%d/%y:").date()
-        elif not line:
+        if not line:
             date = None
+        elif date is None:
+            date = datetime.datetime.strptime(line, "%m/%d/%y:").date()
         else:
             appointments.append(Appointment(date, line))
 

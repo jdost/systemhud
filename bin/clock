@@ -49,7 +49,9 @@ class NextAppointment:
             ):
                 await self._get_next(current)
 
-        assert self.appt is not None
+        if self.appt is None:
+            return
+
         if self.PHASES[self.last_phase] > (self.appt.start - current):
             self.last_phase += 1
             if self.last_phase < len(self.PHASES):
@@ -82,7 +84,9 @@ class NextAppointment:
     @property
     async def phase_color(self) -> colors.Color:
         now = datetime.datetime.now()
-        assert self.appt is not None
+        if self.appt is None:
+            return colors.CLEAR
+
         time_until = self.appt.start - now
         for i, phase in enumerate(self.PHASES):
             if time_until > phase:
