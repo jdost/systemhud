@@ -1,12 +1,12 @@
 import hashlib
 import shutil
 import urllib.request as urllib
-from asyncio.subprocess import Process
 from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, NamedTuple, Optional, Tuple
 
-from systemhud.util import ReversableEnum, capture, start, stream
+from systemhud.streams import Stream, capture
+from systemhud.util import ReversableEnum
 
 STATUS_STREAM_CMD = (
     "/usr/bin/playerctl -a -F metadata -f '{{lc(status)}}\1{{playerName}}'"
@@ -36,7 +36,7 @@ class Track(NamedTuple):
 
 
 class Player:
-    proc: Optional[Process]
+    proc: Optional[Stream]
 
     def __init__(self, name: str, status: Status):
         self.name = name
@@ -56,9 +56,9 @@ class Player:
 
     async def refresh_status(self) -> Status:
         new_status = Status.rlookup(
-            await capture(
-                f"/usr/bin/playerctl --player={self.name} status", split=False
-            )
+            (await capture(f"/usr/bin/playerctl --player={self.name} status"))[
+                0
+            ]
         )
         assert isinstance(new_status, Status)
         self._status = new_status
@@ -69,12 +69,12 @@ class Player:
         return self._status
 
     def stop(self) -> None:
-        if self.proc is not None and self.proc.returncode is None:
-            self.proc.terminate()
+        if self.proc:
+            self.proc.cleanup()
 
     async def status_stream(self) -> AsyncGenerator[Optional[Track], None]:
-        self.proc = await start(self.status_cmd, pipe=True)
-        async for line in stream(self.proc):
+        self.stream = Stream(self.status_cmd)
+        async for line in self.stream:
             print(f"{self.name}: {line!r}")
             if not line:
                 await self.refresh_status()

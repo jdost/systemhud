@@ -9,6 +9,7 @@ from systemhud.ui import colors
 from systemhud.ui.icons import set_icon
 from systemhud.ui.notifications import Notification
 
+
 class Player(mpris.Player):
     BAR_ICONS = {
         "ncspot": "阮",
@@ -75,9 +76,7 @@ class Player(mpris.Player):
 
     def notification(self) -> None:
         if not self._notification:
-            self._notification = Notification(
-                name=self.app, icon=self.gtk_icon
-            )
+            self._notification = Notification(name=self.app, icon=self.gtk_icon)
 
         assert self.now_playing is not None
         body = str(self.now_playing)

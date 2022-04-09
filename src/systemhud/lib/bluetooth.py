@@ -1,7 +1,7 @@
-import asyncio
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Dict, Optional, Tuple
 
-from systemhud.util import ReversableEnum, capture, run, strip_ansi
+from systemhud.streams import capture, run
+from systemhud.util import ReversableEnum, strip_ansi
 
 
 class Status(ReversableEnum):
@@ -122,7 +122,7 @@ async def toggle() -> None:
         await run("bluetoothctl power on")
 
 
-def parse_bluetoothctl_logline(
+def parse_logline(
     raw_msg: str,
 ) -> Tuple[Optional[Status], Optional[Type], str, str]:
     raw_line = raw_msg.split("\r")[-1]

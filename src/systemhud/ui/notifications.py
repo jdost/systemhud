@@ -2,16 +2,18 @@ from os import getuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from systemhud.ui import pango
+from systemhud.ui import colors, pango
 
 
-def progress_bar(n: int, width: int = 20, color: str = "33CC33") -> str:
+def progress_bar(
+    n: int, width: int = 20, color: colors.Color = colors.Color("33CC33")
+) -> str:
     bar = pango.span_tag(background=color)
     step_size = int(100 / width)
     progress = n
-    for i in range(width):
+    for _ in range(width):
         if progress <= 0 and progress > step_size * -1:
-            bar += pango.CLOSE_TAG + pango.span_tag(background="666666")
+            bar += pango.CLOSE_TAG + pango.span_tag(background=colors.GREY)
 
         bar += " "
         progress -= step_size
@@ -47,7 +49,7 @@ class Notification:
             Notify.init(self.name)
 
             self._notification_ref = Notify.Notification.new("", "", "")
-            self._notification_ref.set_app_name(self.name)
+            self._notification_ref.set_app_name(self.name)  # type: ignore
             self._set_transient()
             self._set_hints()
 

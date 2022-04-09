@@ -1,45 +1,37 @@
-[module/cpu]
+[base-systemhud-applet]
 type = custom/script
-exec = ~/.local/systemhud/bin/cpu
 click-left = kill -USR1 %pid%
+format-font = 4
 tail = true
+
+[module/cpu]
+inherit = base-systemhud-applet system-overrides
+exec = ~/.local/systemhud/bin/cpu
+format-font = 3
 
 [module/acpi]
-type = custom/script
+inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/acpi
-click-left = kill -USR1 %pid%
-tail = true
-format-font = 4
 
 [module/bluetooth]
-type = custom/script
+inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/bluetooth
-click-left = kill -USR1 %pid%
-tail = true
-format-font = 4
 
 [module/audio]
-type = custom/script
+inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/pulseaudio
-click-left = kill -USR1 %pid%
 click-right = kill -USR2 %pid%
-tail = True
 
 [module/memory]
-type = custom/script
+inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/memory
-click-left = kill -USR1 %pid%
-tail = True
 
 [module/clock]
-type = custom/script
+inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/clock
-click-left = kill -USR1 %pid%
-tail = True
 
 [module/mpris]
-type = custom/script
+inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/mpris
-tail = True
 
 ; vim:ft=dosini

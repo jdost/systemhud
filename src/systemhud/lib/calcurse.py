@@ -1,7 +1,7 @@
 import datetime
 from typing import List, Optional
 
-from systemhud.util import capture
+from systemhud.streams import capture
 
 APT_FORMAT = "%S %m\n"
 
@@ -26,6 +26,9 @@ class Appointment:
 
     def __gt__(self, other: datetime.datetime) -> bool:
         return self.start > other
+
+
+max_appointment = Appointment(datetime.date.max, "00:00 MAX FUTURE")
 
 
 async def get_appointments(days: int = 1) -> List[Appointment]:

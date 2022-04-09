@@ -2,7 +2,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from systemhud.util import capture
+from systemhud.streams import capture
 
 
 class Status(Enum):
@@ -53,5 +53,5 @@ class Battery:
         elif self.status is Status.UNKNOWN:
             return "UNKNOWN"
 
-        acpi_output = await capture("acpi -b", split=False)
+        acpi_output = "\n".join(await capture("acpi -b"))
         return acpi_output.rsplit(",", 1)[1].strip().split(" ", 1)[0]

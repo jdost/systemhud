@@ -1,12 +1,14 @@
 from typing import Callable, List, Optional
 
+from systemhud.ui import colors
+
 MONOSPACE = "Anonymice Nerd Font Mono"
 CLOSE_TAG = "</span>"
 
 
 def span_tag(
-    foreground: Optional[str] = None,
-    background: Optional[str] = None,
+    foreground: Optional[colors.Color] = None,
+    background: Optional[colors.Color] = None,
     font: Optional[str] = None,
     size: Optional[int] = None,
     weight: Optional[str] = None,
@@ -14,9 +16,9 @@ def span_tag(
 ) -> str:
     tag: List[str] = ["span"]
     if foreground:
-        tag.append(f"foreground='#{foreground}'")
+        tag.append(f"foreground='#{str(foreground)[2:]}'")
     if background:
-        tag.append(f"background='#{background}'")
+        tag.append(f"background='#{str(background)[2:]}'")
     if font:
         font_desc = font
         if weight:
