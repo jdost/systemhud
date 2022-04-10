@@ -29,6 +29,7 @@ exec = ~/.local/systemhud/bin/memory
 [module/clock]
 inherit = base-systemhud-applet system-overrides
 exec = ~/.local/systemhud/bin/clock
+format-font = 1
 
 [module/mpris]
 inherit = base-systemhud-applet system-overrides
