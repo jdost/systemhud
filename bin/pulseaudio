@@ -1,41 +1,100 @@
 #!/usr/bin/env python3
 
-import enum
-import signal
-from datetime import datetime, timedelta
-from time import sleep
 from typing import Optional
 
-from systemhud import register_signal, run, update_stream
+from systemhud import Applet, InteractionType
 from systemhud.lib import pulseaudio
-from systemhud.ui import rofi
-from systemhud.ui.icons import dots, set_icon
+from systemhud.ui import colors, rofi
+from systemhud.ui.icons import BaseIcon, EqDotsIcon
+from systemhud.ui.icons import current_theme as ICONS
 from systemhud.ui.notifications import Notification, progress_bar
-from systemhud.util import set_pidfile
 
-PERIOD = 5
-PROGRESS_BAR_COLOR = "FFFFFF"
-
-
-SINKS = pulseaudio.Devices(pulseaudio.Type.SINK)
-SOURCES = pulseaudio.Devices(pulseaudio.Type.SOURCE)
-NOTIFICATION = Notification(
+applet = Applet("pulseaudio")
+notification = Notification(
     "pulseaudio",
     icon="audio-speakers",
     transient=True,
     timeout=2000,
 )
+sinks = pulseaudio.Devices(pulseaudio.Type.SINK)
+sources = pulseaudio.Devices(pulseaudio.Type.SOURCE)
 
 
-async def update_icon() -> None:
-    set_icon(
-        f"{dots(SINKS.default.volume)}%{{O-7}}{dots(SOURCES.default.volume)}%{{O-14}}%{{F-}} ",
-    )
+class PulseIcon(BaseIcon):
+    def __init__(self):
+        self.eqdots = EqDotsIcon()
+        self.out_volume = sinks.default.volume
+        self.in_volume = sources.default.volume
+        super().__init__("")
+
+    def __str__(self) -> str:
+        return (
+            f"{self.eqdots(self.out_volume)}%{{O-7}}"
+            f"{self.eqdots(self.in_volume)}%{{O-14}}%{{F-}} "
+        )
+
+
+@applet.readiness
+async def wait_for_pulse_socket() -> bool:
+    try:
+        await sinks.update()
+        await sources.update()
+        applet.print_icon(PulseIcon())
+    except AssertionError as e:
+        applet.print_icon(ICONS.UNKNOWN)
+        return False
+
+    return True
+
+
+@applet.stream_update("pactl subscribe")
+async def parse_state_update(line: str) -> Optional[BaseIcon]:
+    global sinks, sources
+    update = False
+    evt, dev_type, dev_id = pulseaudio.parse_event(line)
+
+    if dev_type is None:
+        return
+
+    devs = sinks if dev_type is pulseaudio.Type.SINK else sources
+
+    before = None
+    prev_default = devs.default
+    if evt is pulseaudio.Event.CHANGE:
+        if dev_id not in devs.devices:
+            return
+        before = devs.devices[dev_id]
+
+    if dev_type is pulseaudio.Type.SINK:
+        await sinks.update()
+    elif dev_type is pulseaudio.Type.SOURCE:
+        await sources.update()
+        update = True
+
+    if evt is pulseaudio.Event.CHANGE:
+        if dev_id == devs.default.device_id:
+            update = True
+
+        after = devs.devices[dev_id]
+        assert isinstance(before, pulseaudio.Device)
+        assert isinstance(after, pulseaudio.Device)
+
+        if before.muted != after.muted:
+            await volume_notification(after)
+        elif before.volume != after.volume:
+            await volume_notification(after)
+    else:
+        if prev_default.device_id != devs.default.device_id:
+            # Notify that the default input/output changed
+            pass
+        update = True
+
+    return PulseIcon() if update else None
 
 
 async def volume_notification(dev) -> None:
     if dev.muted:
-        NOTIFICATION(
+        notification(
             title=dev.name,
             body="Muted",
             icon=(
@@ -45,9 +104,9 @@ async def volume_notification(dev) -> None:
             ),
         )
     else:
-        NOTIFICATION(
+        notification(
             title=dev.name,
-            body=progress_bar(dev.volume, color=PROGRESS_BAR_COLOR),
+            body=progress_bar(dev.volume, color=colors.WHITE),
             icon=(
                 "audio-speakers"
                 if dev.device_type is pulseaudio.Type.SINK
@@ -56,8 +115,10 @@ async def volume_notification(dev) -> None:
         )
 
 
+@applet.interaction(InteractionType.LEFT_CLICK)
 async def volume_popup() -> None:
-    dev = SINKS.default
+    dev = sinks.default
+
     selection = await rofi.rofi(
         [
             rofi.Entry("Decrease", icon="audio-volume-low", value="decrease"),
@@ -82,14 +143,16 @@ async def volume_popup() -> None:
         await dev.set_volume(dev.volume + 10)
 
 
-async def device_popup(devs: Optional[pulseaudio.Devices] = None) -> None:
-    if devs is None:
-        devs = SINKS
+@applet.interaction(InteractionType.RIGHT_CLICK)
+async def default_volume_popup() -> None:
+    await device_popup(sinks)
 
+
+async def device_popup(devs: pulseaudio.Devices) -> None:
     _SWITCH_KEY = "__SWITCH__"
     entries = [
         rofi.Entry(
-            "Select " + ("Output" if devs is SOURCES else "Input"),
+            "Select " + ("Output" if devs is sources else "Input"),
             value=_SWITCH_KEY,
         )
     ] + [
@@ -104,66 +167,10 @@ async def device_popup(devs: Optional[pulseaudio.Devices] = None) -> None:
     assert selection.value is not None
     selected_value = int(selection.value)
     if selected_value == _SWITCH_KEY:
-        await device_popup(SOURCES if devs is SINKS else SINKS)
+        await device_popup(sources if devs is sinks else sinks)
     elif selected_value in devs.devices:
         await devs.devices[selected_value].set_default()
 
 
-async def main() -> None:
-    register_signal(signal.SIGUSR1, volume_popup)
-    register_signal(signal.SIGUSR2, device_popup)
-    while True:
-        # On startup, pulse is not always started, this just leaves a filler
-        #  icon until the pulse server starts
-        try:
-            await SINKS.update()
-            break
-        except AssertionError:
-            set_icon("")
-            sleep(5)
-
-    await SOURCES.update()
-    await update_icon()
-
-    async for line in await update_stream("pactl subscribe"):
-        evt, dev_type, dev_id = pulseaudio.parse_event(line)
-
-        if dev_type is None:
-            continue
-
-        devs = SINKS if dev_type is pulseaudio.Type.SINK else SOURCES
-
-        before = None
-        prev_default = devs.default
-        if evt is pulseaudio.Event.CHANGE:
-            if dev_id not in devs.devices:
-                continue
-            before = devs.devices[dev_id]
-
-        if dev_type is pulseaudio.Type.SINK:
-            await SINKS.update()
-        elif dev_type is pulseaudio.Type.SOURCE:
-            await SOURCES.update()
-            await update_icon()
-
-        if evt is pulseaudio.Event.CHANGE:
-            if dev_id == devs.default.device_id:
-                await update_icon()
-
-            after = devs.devices[dev_id]
-            assert isinstance(before, pulseaudio.Device)
-            assert isinstance(after, pulseaudio.Device)
-
-            if before.muted != after.muted:
-                await volume_notification(after)
-            elif before.volume != after.volume:
-                await volume_notification(after)
-        else:
-            if prev_default.device_id != devs.default.device_id:
-                # Notify that the default input/output changed
-                pass
-            await update_icon()
-
-
 if __name__ == "__main__":
-    run(main)
+    applet.run()

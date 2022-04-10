@@ -6,15 +6,18 @@ Features:
 """
 
 import datetime
-import signal
 from typing import List
 
-from systemhud import register_signal, run, timed_updates
+from systemhud import Applet, InteractionType
 from systemhud.lib import calcurse
-from systemhud.ui import calendar, colors
-from systemhud.ui.icons import set_icon
+from systemhud.ui import calendar, colors, pango
+from systemhud.ui.icons import BaseIcon
 from systemhud.ui.notifications import Notification
-from systemhud.ui.pango import MONOSPACE, wrap
+
+applet = Applet("clock")
+calendar_notification = Notification(
+    "calendar", icon="calendar", transient=True, timeout=4000
+)
 
 # ms the notifications show up between phases
 SCHEDULED_NOTIFICATION_TIMEOUT = 15000
@@ -27,13 +30,13 @@ class NextAppointment:
         datetime.timedelta(minutes=0),
         datetime.timedelta(minutes=-10),
     ]
-    PHASE_COLORS = ["", colors.YELLOW, colors.RED, colors.CYAN]
+    PHASE_COLORS = [colors.CLEAR, colors.YELLOW, colors.RED, colors.CYAN]
     last_phase: int
 
     def __init__(self):
         self.appt = None
         self._notification = None
-        self.bgcolor = ""
+        self.bgcolor = colors.CLEAR
         self.last_phase = 0
 
     async def update(self, current: datetime.datetime) -> None:
@@ -41,19 +44,20 @@ class NextAppointment:
             await self._get_next(current)
         else:
             time_until = self.appt.start - current
-            if (
-                time_until > datetime.timedelta(minutes=30)
-                and (time_until.seconds % 300 == 0)
+            if time_until > datetime.timedelta(minutes=30) and (
+                time_until.seconds % 300 == 0
             ):
                 await self._get_next(current)
 
-        assert self.appt is not None
+        if self.appt is None:
+            return
+
         if self.PHASES[self.last_phase] > (self.appt.start - current):
             self.last_phase += 1
             if self.last_phase < len(self.PHASES):
                 self.notification(scheduled=True, relative=True)
-                self.bgcolor = colors.with_opacity(
-                    self.PHASE_COLORS[self.last_phase], opacity=0.3
+                self.bgcolor = self.PHASE_COLORS[self.last_phase].with_opacity(
+                    0.3
                 )
 
     async def _get_next(self, current) -> None:
@@ -66,7 +70,8 @@ class NextAppointment:
             self.appt = appointment
             break
 
-        assert self.appt is not None
+        if self.appt is None:
+            self.appt = calcurse.max_appointment
 
         self._notification = None
         self.last_phase = 0
@@ -74,14 +79,14 @@ class NextAppointment:
         while time_until < self.PHASES[self.last_phase]:
             self.last_phase += 1
 
-        self.bgcolor = colors.with_opacity(
-            self.PHASE_COLORS[self.last_phase], opacity=0.3
-        )
+        self.bgcolor = self.PHASE_COLORS[self.last_phase].with_opacity(0.3)
 
     @property
-    async def phase_color(self) -> str:
+    async def phase_color(self) -> colors.Color:
         now = datetime.datetime.now()
-        assert self.appt is not None
+        if self.appt is None:
+            return colors.CLEAR
+
         time_until = self.appt.start - now
         for i, phase in enumerate(self.PHASES):
             if time_until > phase:
@@ -98,6 +103,8 @@ class NextAppointment:
                 "calendar", icon="calendar", transient=False, timeout=4000
             )
 
+        assert self.appt is not None
+
         body: str
         if relative:
             if datetime.datetime.now() > self.appt.start:
@@ -110,7 +117,6 @@ class NextAppointment:
         else:
             body = f"Starts @ {self.appt.start.strftime('%H:%M')}"
 
-        assert self.appt is not None
         self._notification(
             title=self.appt.name,
             body=body,
@@ -136,48 +142,37 @@ class AppointmentCache:
         return self.cache.__iter__()
 
 
-calendar_notification = Notification(
-    "calendar", icon="calendar", transient=True, timeout=4000
-)
 appointments = AppointmentCache(datetime.timedelta(minutes=5))
 next_appointment = NextAppointment()
 
 
-async def update_clock() -> None:
+@applet.timed_update(1)
+async def update_clock() -> BaseIcon:
     global appointments, next_appointment
 
     now = datetime.datetime.now()
     await next_appointment.update(now)
-    set_icon(
+    return BaseIcon(
         now.strftime("%H:%M:%S"),
-        background=next_appointment.bgcolor,
+        bg=next_appointment.bgcolor,
         offset=True,
     )
 
 
-async def show_calendar_notification(*_) -> None:
+@applet.interaction(InteractionType.LEFT_CLICK)
+async def show_calendar_notification() -> None:
     c = calendar.Calendar(datetime.datetime.now())
     calendar_notification(
         title=c.label,
-        body=wrap(
+        body=pango.wrap(
             "\n".join(
                 c.rows([a.start.date() for a in await appointments.iter()])
             ),
-            font=MONOSPACE,
+            font=pango.MONOSPACE,
             size=14,
         ),
     )
 
 
-async def show_schedule_notification(*_) -> None:
-    pass
-
-
-async def main() -> None:
-    register_signal(signal.SIGUSR1, show_calendar_notification)
-    register_signal(signal.SIGUSR2, show_schedule_notification)
-    await timed_updates(update_clock, 1)
-
-
 if __name__ == "__main__":
-    run(main)
+    applet.run()

@@ -1,36 +1,34 @@
 #!/usr/bin/env python3
 
-import signal
-
-from systemhud import register_signal, run, timed_updates
+from systemhud import Applet, InteractionType
 from systemhud.lib import cpu
-from systemhud.ui import pango
-from systemhud.ui.common import gyr_gradient
-from systemhud.ui.icons import set_icon
+from systemhud.streams import capture
+from systemhud.ui import colors, pango
+from systemhud.ui.icons import BaseIcon
+from systemhud.ui.icons import current_theme as ICONS
 from systemhud.ui.notifications import Notification
-from systemhud.util import capture
 
-PERIOD = 1
-ICON = ""
-NOTIFICATION_ROWS = ["usage", "user", "system", "nice", "iowait", "steal"]
-TOP_PROC_COUNT = 5
-NOTIFICATION = Notification(
+applet = Applet("cpu")
+notification = Notification(
     "cpustats", icon="cpu", transient=True, timeout=4000
 )
 
 
-async def update_icon() -> None:
+@applet.timed_update(1)
+async def check_cpus() -> BaseIcon:
     v = cpu.diffs(update=True)
-    set_icon(ICON, foreground=gyr_gradient(v[0].usage_percent))
+    return ICONS.CPU(v[0].usage_percent)
 
 
-def colored_number(n: int) -> str:
-    color = gyr_gradient(n)
-    return pango.wrap(f"{n:02.0f}", foreground=color)
+def pango_gradient_number(n: int) -> str:
+    return pango.wrap(f"{n:02.0f}", foreground=colors.GYR_GRADIENT(n))
 
 
-async def summary_notification(*_) -> None:
-    global NOTIFICATION_ROWS, NOTIFICATION
+@applet.interaction(InteractionType.LEFT_CLICK)
+async def summary_notification() -> None:
+    global notification
+    stat_rows = ["usage", "user", "system", "nice", "iowait", "steal"]
+    proc_count = 5
 
     body = (
         pango.wrap("Usage Per Core:", size="large", weight="bold")
@@ -40,25 +38,26 @@ async def summary_notification(*_) -> None:
 
     cpus = cpu.diffs()
 
-    col_1_fmt = f"{{:>{max([len(c) for c in (['cpu'] + NOTIFICATION_ROWS)])}}}"
+    col_1_fmt = f"{{:>{max([len(c) for c in (['cpu'] + stat_rows)])}}}"
     body += (" ".join([col_1_fmt] + ["{:>2}"] * len(cpus))).format(
         *["cpu"] + [str(c) for c in range(1, len(cpus) + 1)]
     )
     body += "\n"
 
-    for row_prop in NOTIFICATION_ROWS:
+    for row_prop in stat_rows:
         body += col_1_fmt.format(row_prop)
         for c in cpus:
-            body += (
-                f" {colored_number(int(getattr(c, row_prop) / c.total * 100))}"
+            colored_number = pango_gradient_number(
+                int(getattr(c, row_prop) / c.total * 100)
             )
+            body += f" {colored_number}"
         body += "\n"
 
     body += pango.CLOSE_TAG
 
     body += "\n"
     body += pango.wrap(
-        f"Top {TOP_PROC_COUNT} Processes:", size="large", weight="bold"
+        f"Top {proc_count} Processes:", size="large", weight="bold"
     )
     body += "\n"
     body += pango.span_tag(font=pango.MONOSPACE)
@@ -72,22 +71,17 @@ async def summary_notification(*_) -> None:
         cmd, pid = r.rsplit(maxsplit=1)
         by_process.append((float(perc), name, cmd, pid))
 
-    for proc in sorted(by_process, reverse=True)[:TOP_PROC_COUNT]:
+    for proc in sorted(by_process, reverse=True)[:proc_count]:
         body += "{}% <u>{}</u> ({})\n".format(
             proc[0], proc[2] if len(proc[2]) < 20 else proc[1], proc[3]
         )
 
     body += pango.CLOSE_TAG
-    NOTIFICATION(
+    notification(
         title="CPU USAGE",
         body=body,
     )
 
 
-async def main() -> None:
-    register_signal(signal.SIGUSR1, summary_notification)
-    await timed_updates(update_icon, PERIOD)
-
-
 if __name__ == "__main__":
-    run(main)
+    applet.run()

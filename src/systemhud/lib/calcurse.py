@@ -1,7 +1,7 @@
 import datetime
 from typing import List, Optional
 
-from systemhud.util import capture
+from systemhud.streams import capture
 
 APT_FORMAT = "%S %m\n"
 
@@ -28,6 +28,9 @@ class Appointment:
         return self.start > other
 
 
+max_appointment = Appointment(datetime.date.max, "00:00 MAX FUTURE")
+
+
 async def get_appointments(days: int = 1) -> List[Appointment]:
     date: Optional[datetime.date] = None
     appointments: List[Appointment] = []
@@ -35,10 +38,10 @@ async def get_appointments(days: int = 1) -> List[Appointment]:
     for line in await capture(
         f'calcurse -Q --filter-type cal --days {days} --format-apt="{APT_FORMAT}"'
     ):
-        if date is None:
-            date = datetime.datetime.strptime(line, "%m/%d/%y:").date()
-        elif not line:
+        if not line:
             date = None
+        elif date is None:
+            date = datetime.datetime.strptime(line, "%m/%d/%y:").date()
         else:
             appointments.append(Appointment(date, line))
 

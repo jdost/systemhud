@@ -1,10 +1,23 @@
 import asyncio
 import shutil
+from enum import Enum
 from typing import Dict, List, Optional, Sequence
 
 from systemhud import PKG_ROOT
 
 ROFI_BIN = shutil.which("rofi")
+
+
+class Position(str, Enum):
+    TOPLEFT = "north west"
+    TOPCENTER = "nort"
+    TOPRIGHT = "north east"
+    CENTERLEFT = "west"
+    CENTER = "center"
+    CENTERRIGHT = "east"
+    BOTTOMLEFT = "south west"
+    BOTTOMCENTER = "south"
+    BOTTOMRIGHT = "south east"
 
 
 class Entry:
@@ -44,6 +57,7 @@ async def rofi(
     entries: Sequence[Entry],
     message: str = "",
     theme: str = "icons",
+    position: Position = Position.TOPRIGHT,
 ) -> Optional[Entry]:
     assert ROFI_BIN is not None, "rofi is not installed."
 
@@ -65,11 +79,12 @@ async def rofi(
         "-no-config",
         "-dmenu",
         "-theme",
-        str(PKG_ROOT / f"rofi/{theme}.rasi"),
+        str(PKG_ROOT / f"etc/rofi/{theme}.rasi"),
     ]
     args += ["-u", ",".join(urgents)] if urgents else []
     args += ["-a", ",".join(actives)] if actives else []
     args += ["-mesg", message] if message else []
+    args += ["-theme-str", f"window {{ position: {position}; }}"]
     if theme == "icons":
         args += [
             "-theme-str",

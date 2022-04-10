@@ -1,34 +1,104 @@
 #!/usr/bin/env python3
 
 import asyncio
-import signal
-from time import sleep
 from typing import Dict, Optional
 
-from systemhud import register_signal, run, update_stream
+from systemhud import Applet, InteractionType
 from systemhud.lib import bluetooth
-from systemhud.ui import colors, rofi
-from systemhud.ui.icons import set_icon
+from systemhud.ui import rofi
+from systemhud.ui.icons import BaseIcon
+from systemhud.ui.icons import current_theme as ICONS
 from systemhud.ui.notifications import Notification
 
-ICONS = {
-    "on": ("󰂯", None),
-    "off": ("󰂲", colors.GREY),
-    "connected": ("󰂱", colors.CYAN),
+CTRLR_KEY = "__CONTROLLER__"
+applet = Applet("bluetooth")
+devices: Dict[str, bluetooth.Device] = {}
+per_device_notifications: Dict[str, Notification] = {
+    CTRLR_KEY: Notification("bluetooth", icon="bluetooth", timeout=1500)
 }
-notifications: Dict[str, Notification] = {}
-controller_notification = Notification(
-    "bluetooth", icon="bluetooth", timeout=1500
-)
 
 
-async def menu_popup(*_) -> None:
+@applet.readiness
+async def get_devices() -> bool:
+    global devices
+
+    try:
+        status = await bluetooth.get_status()
+    except Exception:
+        return False
+
+    if status:
+        devices = await bluetooth.get_devices()
+
+    if not status:
+        applet.print_icon(ICONS.BLUETOOTH.off)
+    elif any([d.connected for d in devices.values()]):
+        applet.print_icon(ICONS.BLUETOOTH.connected)
+    else:
+        applet.print_icon(ICONS.BLUETOOTH.on)
+
+    return True
+
+
+@applet.stream_update("bluetoothctl")
+async def parse_status_line(line: str) -> Optional[BaseIcon]:
+    global devices
+
+    (
+        dev_status,
+        dev_type,
+        dev_id,
+        meta,
+    ) = bluetooth.parse_logline(line)
+
+    if dev_type is bluetooth.Type.CONTROLLER:
+        try:
+            k, v = meta.split(":", 1)
+        except ValueError:
+            return
+
+        if k.strip() == "Powered":
+            on = v.strip() == "yes"
+            per_device_notifications[CTRLR_KEY](
+                title="Bluetooth Controller",
+                body=("Powered On" if on else "Powered Off"),
+                image=("bluetooth-active" if on else "bluetooth-disabled"),
+                transient=not on,
+            )
+            if on:
+                devices = await bluetooth.get_devices()
+            return ICONS.BLUETOOTH.on if on else ICONS.BLUETOOTH.off
+    elif dev_type is bluetooth.Type.DEVICE:
+        # This is not a paired devices, TODO support handling pairing a device
+        if dev_id not in devices:
+            return
+
+        if dev_status is bluetooth.Status.CHANGED:
+            if await devices[dev_id].update():
+                device = devices[dev_id]
+
+                per_device_notifications.setdefault(
+                    device.device_id,
+                    Notification("bluetooth", icon="bluetooth", timeout=1500),
+                )(
+                    title=device.name,
+                    body="Connected" if device.connected else "Disconnected",
+                    image=device.icon,
+                    transient=not device.connected,
+                )
+                if device.connected:
+                    return ICONS.BLUETOOTH.connected
+                elif not any([d.connected for d in devices.values()]):
+                    return ICONS.BLUETOOTH.on
+
+
+@applet.interaction(InteractionType.LEFT_CLICK)
+async def rofi_toggles() -> None:
     devices = await bluetooth.get_devices()
     status = bool(await bluetooth.get_status())
-    _CONTROLLER_KEY = "__CONTROLLER__"
     entries = [
         rofi.Entry(
-            "Controller", active=status, icon="bluetooth", value=_CONTROLLER_KEY
+            "Controller", active=status, icon="bluetooth", value=CTRLR_KEY
         )
     ]
     entries += [
@@ -41,7 +111,7 @@ async def menu_popup(*_) -> None:
     selection = await rofi.rofi(entries, theme="icons")
     if not selection:
         return
-    if selection.value == _CONTROLLER_KEY:
+    if selection.value == CTRLR_KEY:
         if status:
             await asyncio.gather(
                 *[d.toggle() for d in devices.values() if d.connected]
@@ -56,83 +126,5 @@ async def menu_popup(*_) -> None:
         await devices[selection.value].toggle()
 
 
-def icon(state: str) -> None:
-    if state not in ICONS:
-        raise KeyError
-
-    icon, color = ICONS[state]
-    set_icon(icon, foreground=color)
-
-
-async def main() -> None:
-    register_signal(signal.SIGUSR1, menu_popup)
-
-    status: bool = await bluetooth.get_status()
-    devices: Dict[str, bluetooth.Device] = (
-        await bluetooth.get_devices() if status else {}
-    )
-
-    if not status:
-        icon("off")
-    elif any([d.connected for d in devices.values()]):
-        icon("connected")
-    else:
-        icon("on")
-
-    async for line in await update_stream("bluetoothctl"):
-        (
-            dev_status,
-            dev_type,
-            dev_id,
-            meta,
-        ) = bluetooth.parse_bluetoothctl_logline(line)
-
-        if dev_type is bluetooth.BluetoothType.CONTROLLER:
-            try:
-                k, v = meta.split(":", 1)
-            except ValueError:
-                continue
-
-            if k.strip() == "Powered":
-                on = v.strip() == "yes"
-                controller_notification(
-                    title="Bluetooth Controller",
-                    body=("Powered On" if on else "Powered Off"),
-                    image=("bluetooth-active" if on else "bluetooth-disabled"),
-                    transient=not on,
-                )
-                icon("on" if on else "off")
-                if on:
-                    devices = await bluetooth.get_devices()
-        elif dev_type is bluetooth.BluetoothType.DEVICE:
-            # This is not a paired devices, TODO support handling pairing a
-            # device
-            if dev_id not in devices:
-                continue
-
-            if dev_status is bluetooth.Status.CHANGED:
-                if await devices[dev_id].update():
-                    device = devices[dev_id]
-                    if device.connected:
-                        icon("connected")
-                    elif not any([d.connected for d in devices.values()]):
-                        icon("on")
-
-                    n = notifications.setdefault(
-                        device.device_id,
-                        Notification(
-                            "bluetooth", icon="bluetooth", timeout=1500
-                        ),
-                    )
-                    n(
-                        title=device.name,
-                        body="Connected"
-                        if device.connected
-                        else "Disconnected",
-                        image=device.icon,
-                        transient=not device.connected,
-                    )
-
-
 if __name__ == "__main__":
-    run(main)
+    applet.run()

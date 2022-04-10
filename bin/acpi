@@ -1,44 +1,33 @@
 #!/usr/bin/env python3
 
-"""
-TODO
- - change the ac adaptor watch to work off of `udevadm` output for the adaptor
-   ^ toggles the timer for level testing
- - add in some notification events around ac change...
-"""
+from typing import Tuple
 
-import signal
-from time import sleep
-from typing import Optional, Tuple
-
-from systemhud import register_signal, run, timed_updates
-from systemhud.lib import acpi
-from systemhud.ui.common import ryg_gradient
-from systemhud.ui.icons import ProgressiveValue, set_icon
+from systemhud import Applet, InteractionType
+from systemhud.lib.acpi import Battery, Status
+from systemhud.ui import colors
+from systemhud.ui.icons import BaseIcon
+from systemhud.ui.icons import current_theme as ICONS
 from systemhud.ui.notifications import Notification, progress_bar
 
-PERIOD = 10
-ICON_AC = ""
-ICON_UNKNOWN = "?"
-LAST_LEVEL: Tuple[bool, int] = (False, 0)
-# LEVEL_ICON = ProgressiveValue("")
-LEVEL_ICON = ProgressiveValue("󰂎󰁺󰁻󰁼󰁽󰁾󰁿󰂀󰂁󰂂󰁹")
+applet = Applet("acpi")
+battery = Battery("BAT0")
+last_reading: Tuple[bool, int] = (False, 0)
+notification = Notification("acpi", timeout=2000)
 
 
-battery = acpi.Battery("BAT0")
-notification = Notification(timeout=2000)
-
-
-async def show_notification(timeout: int = 2000, transient: bool = False):
+async def _show_notification(
+    timeout: int = 2000, transient: bool = False
+) -> None:
     global battery
 
-    if battery.status is acpi.Status.DISCHARGING:
+    if battery.status is Status.DISCHARGING:
         remaining = await battery.remaining
         notification(
             title="Battery Discharging",
             body=(
                 progress_bar(
-                    battery.capacity, color=ryg_gradient(battery.capacity)
+                    battery.capacity,
+                    color=colors.RYG_GRADIENT(battery.capacity),
                 )
                 + f"{battery.capacity}% -- {remaining} remaining"
             ),
@@ -46,19 +35,19 @@ async def show_notification(timeout: int = 2000, transient: bool = False):
             timeout=timeout,
             transient=transient,
         )
-    elif battery.status is acpi.Status.CHARGING:
+    elif battery.status is Status.CHARGING:
         remaining = await battery.remaining
         notification(
             title="Battery Charging",
             body=(
-                progress_bar(battery.capacity, color="FFFFFF")
+                progress_bar(battery.capacity, color=colors.WHITE)
                 + f"{battery.capacity}% -- {remaining} until full"
             ),
             icon=f"battery-level-{int(battery.capacity/10)}0-charging",
             timeout=timeout,
             transient=transient,
         )
-    elif battery.status is acpi.Status.FULL:
+    elif battery.status is Status.FULL:
         notification(
             title="Battery Full",
             body="Running on AC",
@@ -76,40 +65,36 @@ async def show_notification(timeout: int = 2000, transient: bool = False):
         )
 
 
-async def update_icon() -> None:
-    global battery, notification, LEVEL_ICON, LAST_LEVEL
+@applet.interaction(InteractionType.LEFT_CLICK)
+async def show_notification() -> None:
+    await _show_notification()
 
+
+@applet.timed_update(2)
+async def get_battery_level() -> BaseIcon:
+    global battery, last_reading, notification
     battery.uncache()
+    result = ICONS.UNKNOWN
 
-    if battery.status is acpi.Status.FULL:
-        if not LAST_LEVEL[0] or LAST_LEVEL[1] != 100:
-            await show_notification(timeout=1, transient=True)
-            set_icon(ICON_AC)
-    elif battery.status is acpi.Status.CHARGING:
-        if not LAST_LEVEL[0] or LAST_LEVEL[1] != battery.capacity:
-            await show_notification(timeout=1, transient=False)
-            set_icon(LEVEL_ICON(battery.capacity))
-    elif battery.status is acpi.Status.DISCHARGING:
-        if LAST_LEVEL[0] or LAST_LEVEL[1] != battery.capacity:
-            await show_notification(timeout=1, transient=False)
-            set_icon(
-                f"%{{F#{ryg_gradient(battery.capacity)}}}"
-                f"{LEVEL_ICON(battery.capacity)}%{{F-}}"
-            )
-    else:
-        set_icon(ICON_UNKNOWN)
+    if battery.status is Status.FULL:
+        if not last_reading[0] or last_reading[1] != 100:
+            await _show_notification(timeout=1, transient=True)
+        result = ICONS.AC
+    elif battery.status is Status.CHARGING:
+        if not last_reading[0] or last_reading[1] != battery.capacity:
+            await _show_notification(timeout=1, transient=False)
+        result = ICONS.BATTERY_LEVELS(battery.capacity)
+    elif battery.status is Status.DISCHARGING:
+        if last_reading[0] or last_reading[1] != battery.capacity:
+            await _show_notification(timeout=1, transient=False)
+        result = BaseIcon(
+            ICONS.BATTERY_LEVELS(battery.capacity).icon,
+            fg=colors.RYG_GRADIENT(battery.capacity),
+        )
 
-    LAST_LEVEL = battery.status is not acpi.Status.DISCHARGING, battery.capacity
-
-
-async def summary_notification(*_) -> None:
-    await show_notification()
-
-
-async def main() -> None:
-    register_signal(signal.SIGUSR1, summary_notification)
-    await timed_updates(update_icon, PERIOD)
+    last_reading = battery.status is not Status.DISCHARGING, battery.capacity
+    return result
 
 
 if __name__ == "__main__":
-    run(main)
+    applet.run()

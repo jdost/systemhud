@@ -1,12 +1,11 @@
 """
 Wrappers to give pulseaudio information a python interface
 """
-import asyncio
-import enum
 import re
 from typing import AsyncIterator, Dict, List, Optional, Set, Tuple, Union
 
-from systemhud.util import ReversableEnum, capture, run
+from systemhud.streams import capture, run
+from systemhud.util import ReversableEnum
 
 SUBSCRIBE_REGEX = re.compile(
     r"^Event '(new|change|remove)' on "
@@ -137,7 +136,7 @@ async def get_devices(
     curr: Dict[str, Union[str, int, bool]] = {}
     list_type = "list-sinks" if t is Type.SINK else "list-sources"
     stack: List[str] = []
-    for line in await capture(f"pacmd {list_type}"):
+    for line in await capture(f"pacmd {list_type}", strip=False):
         if not line:
             continue
 

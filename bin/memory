@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
 
-import signal
-
-from systemhud import register_signal, run, timed_updates
-from systemhud.lib import memory
+from systemhud import Applet, InteractionType
+from systemhud.lib.memory import Memory
+from systemhud.streams import capture
 from systemhud.ui import pango
-from systemhud.ui.common import gyr_gradient
-from systemhud.ui.icons import set_icon
+from systemhud.ui.icons import BaseIcon
+from systemhud.ui.icons import current_theme as ICONS
 from systemhud.ui.notifications import Notification
-from systemhud.util import capture
 
-PERIOD = 2
-ICON = ""
-MEMORY = memory.Memory()
-NOTIFICATION = Notification(
+applet = Applet("memory")
+tracked_memory = Memory()
+notification = Notification(
     "meminfo", icon="device_mem", transient=True, timeout=4000
 )
-PREFIXES = "kMGT"
-TOP_PROC_COUNT = 5
+
+
+@applet.timed_update(2)
+async def check_memory() -> BaseIcon:
+    global tracked_memory
+    tracked_memory.update()
+    return ICONS.MEMORY(tracked_memory.perc_used)
 
 
 def format_space(src_i: int) -> str:
     src = src_i * 1.0
-    for prefix in PREFIXES:
+    for prefix in "kMGT":
         if src < 9999:
             return f"{str(src)[:4].rstrip('.')} {prefix}"
         src /= 1024
@@ -30,22 +32,21 @@ def format_space(src_i: int) -> str:
     return str(src)
 
 
-async def update_icon() -> None:
-    MEMORY.update()
-    set_icon(ICON, foreground=gyr_gradient(MEMORY.perc_used))
+@applet.interaction(InteractionType.LEFT_CLICK)
+async def summary_notification() -> None:
+    global tracked_memory
+    DISPLAY_PROCS = 5
 
-
-async def summary_notification(*_) -> None:
     body = (
         pango.wrap(
             (
-                f"     Free: {format_space(MEMORY.free)}B\n"
-                f"     Buffered: {format_space(MEMORY.buffered)}B\n"
-                f"     Cached: {format_space(MEMORY.cached)}B\n"
+                f"     Free: {format_space(tracked_memory.free)}B\n"
+                f"     Buffered: {format_space(tracked_memory.buffered)}B\n"
+                f"     Cached: {format_space(tracked_memory.cached)}B\n"
             ),
             size="large",
         )
-        + pango.wrap(f"Top {TOP_PROC_COUNT} Processes", weight="bold")
+        + pango.wrap(f"Top {DISPLAY_PROCS} Processes", weight="bold")
         + pango.span_tag(font=pango.MONOSPACE)
     )
 
@@ -58,20 +59,15 @@ async def summary_notification(*_) -> None:
         cmd, pid = r.rsplit(maxsplit=1)
         by_process.append((int(mem), name, cmd, pid))
 
-    for proc in sorted(by_process, reverse=True)[:TOP_PROC_COUNT]:
+    for proc in sorted(by_process, reverse=True)[:DISPLAY_PROCS]:
         cmd = proc[2] if len(proc[2]) < 20 else proc[1]
         body += f"\n  {format_space(proc[0])}b {pango.wrap(cmd, underline='single')} ({proc[3]})"
 
-    NOTIFICATION(
+    notification(
         title="Memory Usage",
         body=body + pango.CLOSE_TAG,
     )
 
 
-async def main() -> None:
-    register_signal(signal.SIGUSR1, summary_notification)
-    await timed_updates(update_icon, PERIOD)
-
-
 if __name__ == "__main__":
-    run(main)
+    applet.run()
