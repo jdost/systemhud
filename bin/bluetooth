@@ -55,7 +55,7 @@ async def parse_status_line(line: str) -> Optional[BaseIcon]:
         try:
             k, v = meta.split(":", 1)
         except ValueError:
-            return
+            return None
 
         if k.strip() == "Powered":
             on = v.strip() == "yes"
@@ -71,7 +71,7 @@ async def parse_status_line(line: str) -> Optional[BaseIcon]:
     elif dev_type is bluetooth.Type.DEVICE:
         # This is not a paired devices, TODO support handling pairing a device
         if dev_id not in devices:
-            return
+            return None
 
         if dev_status is bluetooth.Status.CHANGED:
             if await devices[dev_id].update():
@@ -90,6 +90,8 @@ async def parse_status_line(line: str) -> Optional[BaseIcon]:
                     return ICONS.BLUETOOTH.connected
                 elif not any([d.connected for d in devices.values()]):
                     return ICONS.BLUETOOTH.on
+
+    return None
 
 
 @applet.interaction(InteractionType.LEFT_CLICK)
