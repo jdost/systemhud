@@ -10,13 +10,13 @@ ROFI_BIN = shutil.which("rofi")
 
 class Position(str, Enum):
     TOPLEFT = "north west"
-    TOPCENTER = "nort"
-    TOPRIGHT = "north east"
-    CENTERLEFT = "west"
+    TOP = "north"
+    TOPRIGHT = "northeast"
+    LEFT = "west"
     CENTER = "center"
-    CENTERRIGHT = "east"
+    RIGHT = "east"
     BOTTOMLEFT = "south west"
-    BOTTOMCENTER = "south"
+    BOTTOM = "south"
     BOTTOMRIGHT = "south east"
 
 
@@ -84,13 +84,13 @@ async def rofi(
     args += ["-u", ",".join(urgents)] if urgents else []
     args += ["-a", ",".join(actives)] if actives else []
     args += ["-mesg", message] if message else []
-    args += ["-theme-str", f"window {{ position: {position}; }}"]
+    args += ["-theme-str", f"window {{ location: {position}; }}"]
     if theme == "icons":
         args += [
             "-theme-str",
             (
                 f"listview {{ columns: {len(items)}; }} "
-                f"window {{ width: {len(items) * 100}; }}"
+                f"window {{ width: {len(items) * 80 + 40}; }}"
             ),
         ]
     else:

@@ -16,7 +16,6 @@ configuration {
 window {
     transparency: "real";
     border-radius: 12px;
-    location: northeast;
     y-offset: 30px;
     x-offset: -10px;
 }
